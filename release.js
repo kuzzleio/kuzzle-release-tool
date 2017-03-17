@@ -3,6 +3,7 @@ const exec = require('child_process').exec
   , prependFile = require('prepend-file')
   , reader = require('./lib/changelog-gen/reader')
   , generator = require('./lib/changelog-gen/generator')
+  , branch = require('./lib/release-mgr/branch')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
@@ -77,6 +78,14 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
 
       if (!dryRun) {
         // todo release
+        branch.getCurrent()
+          .then(branch => {
+            console.log(`You are about to make a release based on branch ${branch}`)
+          })
+          .catch(err => {
+            console.error(err)
+          })
+        // branch.create(tag)
       }
     })
     .catch(err => {

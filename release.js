@@ -48,7 +48,7 @@ if (!tag || !toTag || !fromTag) {
   process.exit(1)
 }
 
-exec(`cd ../ && git fetch && git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout, stderr) => {
+exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout, stderr) => {
   if (error) {
     console.error(error)
     return

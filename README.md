@@ -16,7 +16,7 @@ Clone this repository in the repository you want to release.
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
 
-## Exemple
+## Example
 
 ```
     $ npm i

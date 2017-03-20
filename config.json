@@ -1,9 +1,15 @@
 {
   "ghUrl": "https://github.com",
-  "ghRepoUrl": "http:s//github.com/repos",
+  "ghRepoUrl": "https://github.com/repos",
   "ghApiUrl": "api.github.com",
   "defaultLabel": "Others",
   "breakingChangesLabel": "changelog:breaking-changes",
   "excludeLabel": "changelog:exclude",
-  "complementLabel": "changelog:complements"
+  "complementLabel": "changelog:complements",
+  "labelsPriority": [
+    "Breaking changes",
+    "Bug fixes",
+    "New features",
+    "Enhancements"
+  ]
 }

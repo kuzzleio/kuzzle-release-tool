@@ -2,5 +2,8 @@
   "ghUrl": "https://github.com",
   "ghRepoUrl": "http:s//github.com/repos",
   "ghApiUrl": "api.github.com",
-  "defaultLabel": "Others"
+  "defaultLabel": "Others",
+  "breakingChangesLabel": "changelog:breaking-changes",
+  "excludeLabel": "changelog:exclude",
+  "complementLabel": "changelog:complements"
 }

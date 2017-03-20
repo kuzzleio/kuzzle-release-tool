@@ -3,7 +3,7 @@
   "ghRepoUrl": "http:s//github.com/repos",
   "ghApiUrl": "api.github.com",
   "defaultLabel": "Others",
-  "breakingChangesLabel": "changelog:breaking-changes",
+  "breakingChangesLabel": "changelog:breaking-change",
   "excludeLabel": "changelog:exclude",
   "complementLabel": "changelog:complements"
 }

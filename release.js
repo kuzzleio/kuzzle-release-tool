@@ -4,10 +4,12 @@ const exec = require('child_process').exec
   , reader = require('./lib/changelog-gen/reader')
   , generator = require('./lib/changelog-gen/generator')
   , branch = require('./lib/release-mgr/branch')
+  , bumper = require('./lib/release-mgr/bumper')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
   , repo = repoInfo[2]
+  , ask = require('./lib/ask')
 
   let ghToken
     , toTag
@@ -27,6 +29,8 @@ const help = () => {
   console.log('       --gh-token    Your github token')
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
 }
+
+
 
 const writeChangelog = (changeLog, file) => {
   prependFile(file, changeLog, 'utf8')
@@ -79,15 +83,22 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
       }
 
       if (!dryRun) {
-        // todo release
         branch.getCurrent()
           .then(branch => {
-            console.log(`You are about to make a release based on branch ${branch}`)
+            return ask(`You are about to make a release based on branch ${branch} Are you sure you want to release? (Y|n) `)
+          })
+          .then(() => {
+            return bumper.bumpVersion('42', jsonPackage)
+          })
+          .then(() => {
+            console.log('version bumped')
           })
           .catch(err => {
-            console.error(err)
+            if (err) {
+              console.error(err)
+            }
+            process.exit(1)
           })
-        // branch.create(tag)
       }
     })
     .catch(err => {

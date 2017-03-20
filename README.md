@@ -16,7 +16,7 @@ Clone this repository in the repository you want to release.
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
 
-## Exemple
+## Example
 
 ```
     $ npm i
@@ -24,17 +24,27 @@ Clone this repository in the repository you want to release.
     $ cat CHANGELOG.md
 ```
 
-### [2.0.2](https://github.com/kuzzleio/kuzzle-backoffice/releases/tag/2.0.2) (2017-03-16)
-    
-[Full Changelog](https://github.com/kuzzleio/kuzzle-backoffice/compare/2.0.1...2.0.2)
+### [2.1.0](https://github.com/kuzzleio/kuzzle-backoffice/releases/tag/2.1.0) (2017-03-17)
 
-#### Merged pull request
+[Full Changelog](https://github.com/kuzzleio/kuzzle-backoffice/compare/2.0.1...2.1.0)
 
-- Added unit tests [#232](https://github.com/kuzzleio/kuzzle-backoffice/pull/232)  [https://github.com/jenow](jenow)
-- Fix delete environment button on login form [#231](https://github.com/kuzzleio/kuzzle-backoffice/pull/231) resolve [#222](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/222) [https://github.com/jenow](jenow)
-- Unit tests are back! [#224](https://github.com/kuzzleio/kuzzle-backoffice/pull/224)  [https://github.com/xbill82](xbill82)
-- Fix index tree [#229](https://github.com/kuzzleio/kuzzle-backoffice/pull/229)  [https://github.com/AnthonySendra](AnthonySendra)
-- Allows ssl connections to Kuzzle [#227](https://github.com/kuzzleio/kuzzle-backoffice/pull/227)  [https://github.com/benoitvidis](benoitvidis)
-- CreateFirstAdmin:  fix "reset" parameter format sent to Kuzzle [#226](https://github.com/kuzzleio/kuzzle-backoffice/pull/226) resolve [#225](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/225) [https://github.com/ballinette](ballinette)
-- Fix #220 : enable connection to a port < 1000 [#221](https://github.com/kuzzleio/kuzzle-backoffice/pull/221) resolve [#220](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/220) [https://github.com/ballinette](ballinette)
-- Fix exposed port fort Kuzzle backend: only 7512 is now used [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215)  [https://github.com/ballinette](ballinette)
+#### Enhancements
+
+- [ [#234](https://github.com/kuzzleio/kuzzle-backoffice/pull/234) ] Modified update documents page, now replace document if exist, create it if not   ([AnthonySendra](https://github.com/AnthonySendra))
+- [ [#227](https://github.com/kuzzleio/kuzzle-backoffice/pull/227) ] Allows ssl connections to Kuzzle   ([benoitvidis](https://github.com/benoitvidis))
+
+#### Bug fixes
+
+- [ [#231](https://github.com/kuzzleio/kuzzle-backoffice/pull/231) ] Fix delete environment button on login form  resolve [#222](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/222) ([jenow](https://github.com/jenow))
+- [ [#224](https://github.com/kuzzleio/kuzzle-backoffice/pull/224) ] Fixes the testing toolchain   ([xbill82](https://github.com/xbill82))
+- [ [#229](https://github.com/kuzzleio/kuzzle-backoffice/pull/229) ] Fix item order in index tree   ([AnthonySendra](https://github.com/AnthonySendra))
+- [ [#226](https://github.com/kuzzleio/kuzzle-backoffice/pull/226) ] Fix "reset" parameter format sent to Kuzzle on createFirstAdmin page  resolve [#225](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/225) ([ballinette](https://github.com/ballinette))
+- [ [#221](https://github.com/kuzzleio/kuzzle-backoffice/pull/221) ] Enable backoffice connection to a backend with port < 1000  resolve [#220](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/220) ([ballinette](https://github.com/ballinette))
+
+#### Others
+
+- [ [#233](https://github.com/kuzzleio/kuzzle-backoffice/pull/233) ] Add end to end tests with testim   ([jenow](https://github.com/jenow))
+- [ [#232](https://github.com/kuzzleio/kuzzle-backoffice/pull/232) ] Added unit tests   ([jenow](https://github.com/jenow))
+- [ [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215) ] Fix exposed port for Kuzzle backend in dev env: only 7512 is now used   ([ballinette](https://github.com/ballinette))
+---
+

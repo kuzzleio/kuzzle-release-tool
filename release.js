@@ -62,7 +62,9 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
   let promises = []
 
   prs.forEach(id => {
-    promises.push(reader.readFromGithub(owner, repo, id, ghToken))
+    if (id) {
+      promises.push(reader.readFromGithub(owner, repo, id, ghToken))
+    }
   })
   Promise.all(promises)
     .then(prs => {

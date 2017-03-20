@@ -28,12 +28,6 @@ Clone this repository in the repository you want to release.
 
 [Full Changelog](https://github.com/kuzzleio/kuzzle-backoffice/compare/2.0.1...2.1.0)
 
-#### Merged pull request
-
-- [ [#233](https://github.com/kuzzleio/kuzzle-backoffice/pull/233) ] Add end to end tests with testim   ([jenow](https://github.com/jenow))
-- [ [#232](https://github.com/kuzzleio/kuzzle-backoffice/pull/232) ] Added unit tests   ([jenow](https://github.com/jenow))
-- [ [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215) ] Fix exposed port for Kuzzle backend in dev env: only 7512 is now used   ([ballinette](https://github.com/ballinette))
-
 #### Enhancement
 
 - [ [#234](https://github.com/kuzzleio/kuzzle-backoffice/pull/234) ] Modified update documents page, now replace document if exist, create it if not   ([AnthonySendra](https://github.com/AnthonySendra))
@@ -46,5 +40,11 @@ Clone this repository in the repository you want to release.
 - [ [#229](https://github.com/kuzzleio/kuzzle-backoffice/pull/229) ] Fix item order in index tree   ([AnthonySendra](https://github.com/AnthonySendra))
 - [ [#226](https://github.com/kuzzleio/kuzzle-backoffice/pull/226) ] Fix "reset" parameter format sent to Kuzzle on createFirstAdmin page  resolve [#225](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/225) ([ballinette](https://github.com/ballinette))
 - [ [#221](https://github.com/kuzzleio/kuzzle-backoffice/pull/221) ] Enable backoffice connection to a backend with port < 1000  resolve [#220](https://github.com/repos/kuzzleio/kuzzle-backoffice/issues/220) ([ballinette](https://github.com/ballinette))
+
+#### Merged pull request
+
+- [ [#233](https://github.com/kuzzleio/kuzzle-backoffice/pull/233) ] Add end to end tests with testim   ([jenow](https://github.com/jenow))
+- [ [#232](https://github.com/kuzzleio/kuzzle-backoffice/pull/232) ] Added unit tests   ([jenow](https://github.com/jenow))
+- [ [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215) ] Fix exposed port for Kuzzle backend in dev env: only 7512 is now used   ([ballinette](https://github.com/ballinette))
 ---
 

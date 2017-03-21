@@ -1,15 +1,19 @@
 {
-  "ghUrl": "https://github.com",
-  "ghRepoUrl": "https://github.com/repos",
-  "ghApiUrl": "api.github.com",
-  "defaultLabel": "Others",
-  "breakingChangesLabel": "changelog:breaking-changes",
-  "excludeLabel": "changelog:exclude",
-  "complementLabel": "changelog:complements",
-  "labelsPriority": [
-    "Breaking changes",
-    "Bug fixes",
-    "New features",
-    "Enhancements"
-  ]
+  "github": {
+    "url": "https://github.com",
+    "repository": "https://github.com/repos",
+    "api": "api.github.com"
+  },
+  "labels": {
+    "default": "Others",
+    "breaking": "changelog:breaking-changes",
+    "exclude": "changelog:exclude",
+    "complements": "changelog:complements",
+    "priority": [
+      "Breaking changes",
+      "Bug fixes",
+      "New features",
+      "Enhancements"
+    ]
+  }
 }

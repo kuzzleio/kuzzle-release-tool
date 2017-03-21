@@ -5,6 +5,7 @@ const exec = require('child_process').exec
   , generator = require('./lib/changelog-gen/generator')
   , branch = require('./lib/release-mgr/branch')
   , bumper = require('./lib/release-mgr/bumper')
+  , Bluebird = require('bluebird')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
@@ -71,15 +72,15 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
       promises.push(reader.readFromGithub(owner, repo, id, ghToken))
     }
   })
+
   Promise.all(promises)
-    .then(prs => {
-      const
-        changeLog = generator.generate(owner, repo, tag, jsonPackage.version, prs)
+    .then(result => generator.generate(owner, repo, tag, jsonPackage.version, result))
+    .then(changeLog => {
 
       if (outputFile) {
         writeChangelog(changeLog, outputFile)
       } else {
-        console.log(changeLog)
+        console.log('lolilol = ', changeLog)
       }
 
       if (!dryRun) {
@@ -87,12 +88,13 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
           .then(branch => {
             return ask(`You are about to make a release based on branch ${branch} Are you sure you want to release? (Y|n) `)
           })
-          .then(() => {
-            return bumper.bumpVersion('42', jsonPackage)
-          })
-          .then(() => {
-            console.log('version bumped')
-          })
+          // .then(() => {
+          //   console.log('bumping version')
+          //   return bumper.bumpVersion(tag, jsonPackage)
+          // })
+          // .then(() => {
+          //   console.log('version bumped')
+          // })
           .catch(err => {
             if (err) {
               console.error(err)
@@ -102,6 +104,9 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
       }
     })
     .catch(err => {
-      console.error(err)
+      if (err) {
+        console.error(err)
+      }
+      process.exit(1)
     })
 })

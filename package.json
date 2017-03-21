@@ -1,0 +1,6 @@
+{
+  "name": "kuzzle-release-tool",
+  "dependencies": {
+    "prepend-file": "^1.3.1"
+  }
+}

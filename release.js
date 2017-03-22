@@ -5,7 +5,6 @@ const exec = require('child_process').exec
   , generator = require('./lib/changelog-gen/generator')
   , branch = require('./lib/release-mgr/branch')
   , bumper = require('./lib/release-mgr/bumper')
-  , Bluebird = require('bluebird')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
@@ -31,8 +30,6 @@ const help = () => {
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
 }
 
-
-
 const writeChangelog = (changeLog, file) => {
   prependFile(file, changeLog, 'utf8')
 }
@@ -54,13 +51,9 @@ if (!tag || !toTag || !fromTag) {
   process.exit(1)
 }
 
-exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout, stderr) => {
+exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
   if (error) {
     console.error(error)
-    return
-  }
-  if (stderr) {
-    console.error(stderr)
     return
   }
 
@@ -80,21 +73,15 @@ exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${
       if (outputFile) {
         writeChangelog(changeLog, outputFile)
       } else {
-        console.log('lolilol = ', changeLog)
+        console.log(changeLog)
       }
 
       if (!dryRun) {
         branch.getCurrent()
-          .then(branch => {
-            return ask(`You are about to make a release based on branch ${branch} Are you sure you want to release? (Y|n) `)
-          })
-          // .then(() => {
-          //   console.log('bumping version')
-          //   return bumper.bumpVersion(tag, jsonPackage)
-          // })
-          // .then(() => {
-          //   console.log('version bumped')
-          // })
+          .then(branch => ask(`You are about to make a release based on branch ${branch}Are you sure you want to release? (Y|n) `))
+          .then(() => branch.create(tag))
+          .then(() => bumper.bumpVersion(tag, jsonPackage))
+          .then(() => branch.push(tag))
           .catch(err => {
             if (err) {
               console.error(err)

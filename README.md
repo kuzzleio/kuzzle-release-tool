@@ -56,9 +56,6 @@ This script follows the following steps to make a release:
 - Push the branch
 - Forward travis output while it runs all the tests
 - Delete the branch once finished
-- Create a new branch on the repo you want to release based on the branch you're currently on
-- Update version in package.json
-- Push the branch
 
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
 

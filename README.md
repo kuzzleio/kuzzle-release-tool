@@ -1,7 +1,5 @@
 Tool to auto generate a changelog from 2 branches of any repository and auto release it on github (todo)
 
-:warning: Release is not implemented yet
-
 ## Usage
 
 Clone this repository in the repository you want to release.
@@ -16,11 +14,11 @@ Clone this repository in the repository you want to release.
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
 
-## Example
+## Changelog generation example
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --dry-run --output CHANGELOG.md
+    $ node release.js --from master --to 2.x --tag 2.1.0 --dry-run --output ../CHANGELOG.md
     $ cat CHANGELOG.md
 ```
 
@@ -48,3 +46,21 @@ Clone this repository in the repository you want to release.
 - [ [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215) ] Fix exposed port for Kuzzle backend in dev env: only 7512 is now used   ([ballinette](https://github.com/ballinette))
 ---
 
+## Release process
+
+This script follows the following steps to make a release:
+
+- Create a new branch on the kuzzle-test-environment (x.y.z-proposal)
+- Rewrite the .travis.yml according to the version configuration in compat.json
+- Ask you for a review of the .travis.yml
+- Push the branch
+- Forward travis output while it runs all the tests
+- Delete the branch once finished
+- Create a new branch on the repo you want to release based on the branch you're currently on
+- Update version in package.json
+- Push the branch
+
+You must fill the compat.json to specify which version of kuzzle and proxy you want to test
+
+TODO:
+- Create release on github

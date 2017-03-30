@@ -55,9 +55,7 @@ if (!tag || !toTag || !fromTag) {
 prerequisite.hasTestEnv()
   .then(() => {
     run()
-      .then(() => {
-        return runTest()
-      })
+      .then(() => runTest())
       .then(() => process.exit(0))
       .catch(err => {
         if (err) {

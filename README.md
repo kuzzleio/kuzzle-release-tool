@@ -50,9 +50,10 @@ Clone this repository in the repository you want to release.
 
 This script follows the following steps to make a release:
 
+- Ask you for a review of the branch to release and compat.json
+- Ask you for a review of the .travis.yml
 - Create a new branch on the kuzzle-test-environment (x.y.z-proposal)
 - Rewrite the .travis.yml according to the version configuration in compat.json
-- Ask you for a review of the .travis.yml
 - Push the branch
 - Forward travis output while it runs all the tests
 - Delete the branch once finished

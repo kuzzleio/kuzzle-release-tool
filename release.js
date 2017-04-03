@@ -6,12 +6,15 @@ const exec = require('child_process').exec
   , branch = require('./lib/release-mgr/branch')
   , prerequisite = require('./lib/prerequisite')
   , testEnv = require('./lib/release-mgr/test-env')
+  , bumper = require('./lib/release-mgr/bumper')
   , compat = require('./compat.json')
+  , ask = require('./lib/ask')
+  , crypto = require('crypto')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
   , repo = repoInfo[2]
-  , ask = require('./lib/ask')
+  , envTestBranchName = crypto.createHmac('sha256', 'kuzzlerox').digest('hex')
 
   let ghToken
     , toTag
@@ -32,13 +35,21 @@ const help = () => {
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
 }
 
-const writeChangelog = (changeLog, file) => {
-  prependFile(file, changeLog, 'utf8')
-}
 
 if (args.includes('--help')) {
   help()
   process.exit(1)
+}
+
+const writeChangelog = (changeLog, file) => {
+  return new Promise((resolve, reject) => {
+    prependFile(file, changeLog, 'utf8', err => {
+      if (err) {
+        return reject(err)
+      }
+      resolve()
+    })
+  })
 }
 
 ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null
@@ -53,39 +64,7 @@ if (!tag || !toTag || !fromTag) {
   process.exit(1)
 }
 
-prerequisite.hasTestEnv()
-  .then(() => {
-    run()
-      .then(() => runTest())
-      .then(() => process.exit(0))
-      .catch(err => {
-        if (err) {
-          console.error(err)
-        }
-        process.exit(1)
-      })
-  })
-  .catch(() => {
-    console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive')
-  })
-
-const runTest = () => {
-  return branch.getCurrent()
-    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `)
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
-    .then(() => testEnv.reviewTravisYml()
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
-    .then(() => testEnv.createProposalBranch(tag))
-    .then(() => testEnv.writeMatrix())
-    .then(() => testEnv.pushProposalBranch(tag))
-    .then(() => testEnv.streamLog(ghToken))
-    .then(() => testEnv.deleteProposalBranch(tag))
-    .catch(() => testEnv.deleteProposalBranch(tag))
-}
-
-const run = () => {
+const makeChangelog = () => {
   return new Promise((resolve, reject) => {
     exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
@@ -106,11 +85,12 @@ const run = () => {
         .then(result => generator.generate(owner, repo, tag, jsonPackage.version, result))
         .then(changeLog => {
           if (outputFile) {
-            writeChangelog(changeLog, outputFile)
+            return writeChangelog(changeLog, outputFile)
+              .then(() => resolve())
           } else {
             console.log(changeLog)
+            resolve()
           }
-          resolve()
         })
         .catch(err => {
           if (err) {
@@ -121,3 +101,44 @@ const run = () => {
     })
   })
 }
+
+const prepareRelease = () => {
+  return branch.create(tag)
+    .then(() => makeChangelog())
+    .then(() => bumper.bumpVersion(tag, jsonPackage))
+    .then(() => branch.push(tag))
+    // .then(() => branch.delete(tag))
+}
+
+const runTest = () => {
+  return branch.getCurrent()
+    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `)
+      .then(() => Promise.resolve())
+      .catch(() => process.exit(1)))
+    .then(() => testEnv.reviewTravisYml()
+      .then(() => Promise.resolve())
+      .catch(() => process.exit(1)))
+    .then(() => testEnv.createProposalBranch(envTestBranchName))
+    .then(() => testEnv.writeMatrix())
+    .then(() => testEnv.pushProposalBranch(envTestBranchName))
+    .then(() => testEnv.streamLog(ghToken))
+    .then(() => testEnv.deleteProposalBranch(envTestBranchName))
+    .catch(() => testEnv.deleteProposalBranch(envTestBranchName))
+}
+
+// Let's run everything
+prerequisite.hasTestEnv()
+  .then(() => {
+    runTest()
+      .then(() => prepareRelease())
+      .then(() => process.exit(0))
+      .catch(err => {
+        if (err) {
+          console.error(err)
+        }
+        process.exit(1)
+      })
+  })
+  .catch(() => {
+    console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive')
+  })

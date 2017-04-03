@@ -7,6 +7,7 @@ const exec = require('child_process').exec
   , prerequisite = require('./lib/prerequisite')
   , testEnv = require('./lib/release-mgr/test-env')
   , bumper = require('./lib/release-mgr/bumper')
+  , pr = require('./lib/release-mgr/pull-request')
   , compat = require('./compat.json')
   , ask = require('./lib/ask')
   , crypto = require('crypto')
@@ -86,10 +87,10 @@ const makeChangelog = () => {
         .then(changeLog => {
           if (outputFile) {
             return writeChangelog(changeLog, outputFile)
-              .then(() => resolve())
+              .then(() => resolve(changeLog))
           } else {
             console.log(changeLog)
-            resolve()
+            resolve(changeLog)
           }
         })
         .catch(err => {
@@ -103,10 +104,17 @@ const makeChangelog = () => {
 }
 
 const prepareRelease = () => {
+  let changelog
+
   return branch.create(tag)
     .then(() => makeChangelog())
-    .then(() => bumper.bumpVersion(tag, jsonPackage))
+    .then((changes) => {
+      changelog = changes
+      return bumper.bumpVersion(tag, jsonPackage)
+    })
     .then(() => branch.push(tag))
+    .then(() => pr.create(owner, repo, ghToken, tag, changelog)
+    )
     // .then(() => branch.delete(tag))
 }
 

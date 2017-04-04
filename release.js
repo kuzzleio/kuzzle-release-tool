@@ -41,6 +41,12 @@ if (args.includes('--help')) {
   process.exit(1)
 }
 
+process.on('exit', () => {
+  console.log('exit')
+  testEnv.deleteProposalBranch(envTestBranchName)
+  branch.delete(`${tag}-proposal`)
+})
+
 const writeChangelog = (changeLog, file) => {
   return new Promise((resolve, reject) => {
     prependFile(file, changeLog, 'utf8', err => {
@@ -114,7 +120,6 @@ const prepareRelease = () => {
     .then(() => branch.push(tag))
     .then(() => pr.create(owner, repo, ghToken, tag, changelog)
     )
-    // .then(() => branch.delete(tag))
 }
 
 const runTest = () => {
@@ -129,10 +134,6 @@ const runTest = () => {
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
     .then(() => testEnv.streamLog(ghToken, envTestBranchName))
-    .then(() => testEnv.deleteProposalBranch(envTestBranchName))
-    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName)
-      .then(() => Promise.reject(err))
-      .catch(err2 => Promise.reject(err2)))
 }
 
 // Let's run everything

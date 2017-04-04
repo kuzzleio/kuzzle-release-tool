@@ -36,7 +36,6 @@ const help = () => {
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
 }
 
-
 if (args.includes('--help')) {
   help()
   process.exit(1)
@@ -129,9 +128,11 @@ const runTest = () => {
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
-    .then(() => testEnv.streamLog(ghToken))
+    .then(() => testEnv.streamLog(ghToken, envTestBranchName))
     .then(() => testEnv.deleteProposalBranch(envTestBranchName))
-    .catch(() => testEnv.deleteProposalBranch(envTestBranchName))
+    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName)
+      .then(() => Promise.reject(err))
+      .catch(err2 => Promise.reject(err2)))
 }
 
 // Let's run everything

@@ -42,7 +42,6 @@ if (args.includes('--help')) {
 }
 
 process.on('exit', () => {
-  console.log('exit')
   testEnv.deleteProposalBranch(envTestBranchName)
   branch.delete(`${tag}-proposal`)
 })
@@ -115,6 +114,7 @@ const prepareRelease = () => {
     .then(() => makeChangelog())
     .then((changes) => {
       changelog = changes
+
       return bumper.bumpVersion(tag, jsonPackage)
     })
     .then(() => branch.push(tag))

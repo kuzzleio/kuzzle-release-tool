@@ -15,7 +15,7 @@ const exec = require('child_process').exec
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
   , repo = repoInfo[2]
-  , envTestBranchName = crypto.createHmac('sha256', 'kuzzlerox').digest('hex')
+  , envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
 
   let ghToken
     , toTag

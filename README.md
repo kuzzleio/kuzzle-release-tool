@@ -56,9 +56,11 @@ This script follows the following steps to make a release:
 - Rewrite the .travis.yml according to the version configuration in compat.json
 - Push the branch
 - Forward travis output while it runs all the tests
-- Delete the branch once finished
+- Delete the test branch once finished
+
+Once the tests passed:
+- Push the proposal branch on github
+- Create a pull request for the release and add the "release" label
 
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
 
-TODO:
-- Create release on github

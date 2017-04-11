@@ -17,13 +17,13 @@ const exec = require('child_process').exec
   , repo = repoInfo[2]
   , envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
 
-  let ghToken
-    , toTag
-    , fromTag
-    , tag
-    , dryRun
-    , outputFile
-    , noCleanup
+  const
+    ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null
+    , toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null
+    , fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null
+    , tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null
+    , outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null
+    , noCleanup = args.includes('--no-cleanup')
 
 const help = () => {
   console.log('usage:')
@@ -53,14 +53,6 @@ const writeChangelog = (changeLog, file) => {
     })
   })
 }
-
-ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null
-toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null
-fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null
-tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null
-dryRun = args.includes('--dry-run')
-outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null
-noCleanup = args.includes('--no-cleanup')
 
 if (!tag || !toTag || !fromTag) {
   help()

@@ -23,6 +23,7 @@ const exec = require('child_process').exec
     , tag
     , dryRun
     , outputFile
+    , noCleanup
 
 const help = () => {
   console.log('usage:')
@@ -34,17 +35,13 @@ const help = () => {
   console.log('       --help        Show this help')
   console.log('       --dry-run     Generate changelog and run tests but do not release')
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
+  console.log('       --no-cleanup  Do not delete local and remote branches if the script fails')
 }
 
 if (args.includes('--help')) {
   help()
   process.exit(1)
 }
-
-process.on('exit', () => {
-  testEnv.deleteProposalBranch(envTestBranchName)
-  branch.delete(`${tag}-proposal`)
-})
 
 const writeChangelog = (changeLog, file) => {
   return new Promise((resolve, reject) => {
@@ -62,7 +59,8 @@ toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null
 fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null
 tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null
 dryRun = args.includes('--dry-run')
-outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1]: null
+outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null
+noCleanup = args.includes('--no-cleanup')
 
 if (!tag || !toTag || !fromTag) {
   help()
@@ -107,22 +105,12 @@ const makeChangelog = () => {
   })
 }
 
-const prepareRelease = () => {
-  let changelog
-
-  return branch.create(tag)
-    .then(() => makeChangelog())
-    .then((changes) => {
-      changelog = changes
-
-      return bumper.bumpVersion(tag, jsonPackage)
-    })
-    .then(() => branch.push(tag))
-    .then(() => pr.create(owner, repo, ghToken, tag, changelog))
-    .then(issue => pr.updateLabels(owner, repo, issue.number, ghToken))
-}
-
 const runTest = () => {
+  let changelog
+    , sha
+    , travisBuild
+    , buildId
+
   return branch.getCurrent()
     .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `)
       .then(() => Promise.resolve())
@@ -133,20 +121,51 @@ const runTest = () => {
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
-    .then(() => testEnv.streamLog(ghToken, envTestBranchName))
+    .then(() => branch.create(tag))
+    .then(() => makeChangelog())
+    .then((changes) => {
+      changelog = changes
+
+      return bumper.bumpVersion(tag, jsonPackage)
+    })
+    .then(() => branch.push(tag))
+    .then(() => pr.create(owner, repo, ghToken, tag, changelog))
+    .then(issue => {
+      sha = issue.head.sha
+
+      return pr.updateLabels(owner, repo, issue.number, ghToken)
+    })
+    .then(() => testEnv.getBuildNumber(envTestBranchName, ghToken)
+      .then(build => {
+        travisBuild = build.replace('\n', '')
+
+        return Promise.resolve()
+      }))
+    .then(() => testEnv.getTravisBuildId(envTestBranchName))
+    .then(id => {
+      console.log(id)
+      buildId = id
+
+      return pr.updateStatus(owner, repo, sha, 'pending', ghToken, buildId)
+    })
+    .then(() => testEnv.streamLog(ghToken, travisBuild))
+    .then(res => pr.updateStatus(owner, repo, sha, res.status, ghToken, buildId))
 }
 
 // Let's run everything
 prerequisite.hasTestEnv()
   .then(() => {
     runTest()
-      .then(() => prepareRelease())
       .then(() => process.exit(0))
       .catch(err => {
         if (err) {
           console.error(err)
         }
-        process.exit(1)
+        if (!noCleanup) {
+          // Clean up
+          testEnv.deleteProposalBranch(envTestBranchName)
+          branch.delete(`${tag}`)
+        }
       })
   })
   .catch(() => {

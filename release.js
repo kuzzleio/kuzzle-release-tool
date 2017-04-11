@@ -119,20 +119,14 @@ const prepareRelease = () => {
 
 const runTest = () => {
   return branch.getCurrent()
-    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `)
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
-    .then(() => testEnv.reviewTravisYml()
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
+    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `))
+    .then(() => testEnv.reviewTravisYml())
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
     .then(() => testEnv.streamLog(ghToken, envTestBranchName))
     .then(() => testEnv.deleteProposalBranch(envTestBranchName))
-    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName)
-      .then(() => Promise.reject(err))
-      .catch(err2 => Promise.reject(err2)))
+    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName))
 }
 
 // Let's run everything

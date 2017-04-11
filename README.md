@@ -13,12 +13,13 @@ Clone this repository in the repository you want to release.
 | --dry-run  | Generate changelog but do not release
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
+| --output   | Do not delete created branches if error
 
-## Changelog generation example
+## Usage example
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --dry-run --output ../CHANGELOG.md
+    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md
     $ cat CHANGELOG.md
 ```
 
@@ -50,17 +51,20 @@ Clone this repository in the repository you want to release.
 
 This script follows the following steps to make a release:
 
+- Check if you cloned the kuzzle-test-environment submodule
 - Ask you for a review of the branch to release and compat.json
 - Ask you for a review of the .travis.yml
 - Create a new branch on the kuzzle-test-environment (x.y.z-proposal)
 - Rewrite the .travis.yml according to the version configuration in compat.json
-- Push the branch
-- Forward travis output while it runs all the tests
-- Delete the test branch once finished
-
-Once the tests passed:
-- Push the proposal branch on github
-- Create a pull request for the release and add the "release" label
+- Push the test branch
+- Create proposal branch on the project to release
+- Write the CHANGELOG
+- Update version on package.json
+- Commit and push the branch
+- Create release request (PR)
+- Add "release" label on the release request
+- Add custom status of the kuzzle-test-environment travis job on the release request
+- Stream travis log of kuzzle-test-environment
+- Update custom status of the kuzzle-test-environment travis job on the release request
 
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
-

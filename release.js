@@ -112,12 +112,8 @@ const runTest = () => {
     , buildId
 
   return branch.getCurrent()
-    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `)
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
-    .then(() => testEnv.reviewTravisYml()
-      .then(() => Promise.resolve())
-      .catch(() => process.exit(1)))
+    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: ${JSON.stringify(compat, null, 2)}\nAre you sure you want to release? (Y|n) `))
+    .then(() => testEnv.reviewTravisYml())
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
@@ -135,15 +131,13 @@ const runTest = () => {
 
       return pr.updateLabels(owner, repo, issue.number, ghToken)
     })
-    .then(() => testEnv.getBuildNumber(envTestBranchName, ghToken)
-      .then(build => {
-        travisBuild = build.replace('\n', '')
+    .then(() => testEnv.getBuildNumber(envTestBranchName, ghToken))
+    .then(build => {
+      travisBuild = build.replace('\n', '')
 
-        return Promise.resolve()
-      }))
-    .then(() => testEnv.getTravisBuildId(envTestBranchName))
+      return testEnv.getTravisBuildId(envTestBranchName)
+    })
     .then(id => {
-      console.log(id)
       buildId = id
 
       return pr.updateStatus(owner, repo, sha, 'pending', ghToken, buildId)

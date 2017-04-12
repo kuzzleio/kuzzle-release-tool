@@ -7,6 +7,7 @@ const exec = require('child_process').exec
   , prerequisite = require('./lib/prerequisite')
   , testEnv = require('./lib/release-mgr/test-env')
   , bumper = require('./lib/release-mgr/bumper')
+  , pr = require('./lib/release-mgr/pull-request')
   , compat = require('./compat.json')
   , ask = require('./lib/ask')
   , crypto = require('crypto')
@@ -34,7 +35,6 @@ const help = () => {
   console.log('       --dry-run     Generate changelog and run tests but do not release')
   console.log('       --output      Changelog file (stdout will be used if this option is not set)')
 }
-
 
 if (args.includes('--help')) {
   help()
@@ -86,10 +86,10 @@ const makeChangelog = () => {
         .then(changeLog => {
           if (outputFile) {
             return writeChangelog(changeLog, outputFile)
-              .then(() => resolve())
+              .then(() => resolve(changeLog))
           } else {
             console.log(changeLog)
-            resolve()
+            resolve(changeLog)
           }
         })
         .catch(err => {
@@ -103,9 +103,14 @@ const makeChangelog = () => {
 }
 
 const prepareRelease = () => {
+  let changelog
+
   return branch.create(tag)
     .then(() => makeChangelog())
-    .then(() => bumper.bumpVersion(tag, jsonPackage))
+    .then((changes) => {
+      changelog = changes
+      return bumper.bumpVersion(tag, jsonPackage)
+    })
     .then(() => branch.push(tag))
 }
 
@@ -116,9 +121,9 @@ const runTest = () => {
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
-    .then(() => testEnv.streamLog(ghToken))
+    .then(() => testEnv.streamLog(ghToken, envTestBranchName))
     .then(() => testEnv.deleteProposalBranch(envTestBranchName))
-    .catch(() => testEnv.deleteProposalBranch(envTestBranchName))
+    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName))
 }
 
 // Let's run everything

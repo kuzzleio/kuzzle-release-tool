@@ -15,5 +15,9 @@
       "New features",
       "Enhancements"
     ]
+  },
+  "travis": {
+    "totalRetry": "500",
+    "retryInterval": "500"
   }
 }

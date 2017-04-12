@@ -11,6 +11,7 @@ const exec = require('child_process').exec
   , compat = require('./compat.json')
   , ask = require('./lib/ask')
   , crypto = require('crypto')
+  , fs = require('fs')
   , args = process.argv.slice(2)
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
@@ -79,13 +80,18 @@ const makeChangelog = () => {
       Promise.all(promises)
         .then(result => generator.generate(owner, repo, tag, jsonPackage.version, result))
         .then(changeLog => {
-          if (outputFile) {
-            return writeChangelog(changeLog, outputFile)
-              .then(() => resolve(changeLog))
-          } else {
-            console.log(changeLog)
-            resolve(changeLog)
-          }
+          fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
+            if (err) {
+              return reject(err)
+            }
+            if (outputFile) {
+              return writeChangelog(changeLog, outputFile)
+                .then(() => resolve(changeLog))
+            } else {
+              console.log(changeLog)
+              resolve(changeLog)
+            }
+          })
         })
         .catch(err => {
           if (err) {
@@ -145,7 +151,7 @@ prerequisite.hasTestEnv()
       .then(() => process.exit(0))
       .catch(err => {
         if (err) {
-          console.error(err)
+          console.error(`\x1b[31m${err}\x1b[0m`)
         }
         if (!noCleanup) {
           // Clean up

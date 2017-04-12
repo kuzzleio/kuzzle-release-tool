@@ -1,9 +1,9 @@
 const exec = require('child_process').exec
   , jsonPackage = require('../package.json')
   , prependFile = require('prepend-file')
-  , reader = require('./lib/changelog-gen/reader')
-  , generator = require('./lib/changelog-gen/generator')
-  , branch = require('./lib/release-mgr/branch')
+  , Reader = require('./lib/changelog-gen/reader')
+  , Generator = require('./lib/changelog-gen/generator')
+  , Branch = require('./lib/release-mgr/branch')
   , prerequisite = require('./lib/prerequisite')
   , testEnv = require('./lib/release-mgr/test-env')
   , bumper = require('./lib/release-mgr/bumper')
@@ -70,15 +70,17 @@ const makeChangelog = () => {
 
       let prs = stdout.split('\n')
       let promises = []
+      const generator = new Generator(owner, repo, tag, ghToken)
+        , reader = new Reader(owner, repo, ghToken)
 
       prs.forEach(id => {
         if (id) {
-          promises.push(reader.readFromGithub(owner, repo, id, ghToken))
+          promises.push(reader.readFromGithub(id))
         }
       })
 
       Promise.all(promises)
-        .then(result => generator.generate(owner, repo, tag, jsonPackage.version, result))
+        .then(result => generator.generate(jsonPackage.version, result))
         .then(changeLog => {
           fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
             if (err) {
@@ -147,6 +149,7 @@ const runTest = () => {
 // Let's run everything
 prerequisite.hasTestEnv()
   .then(() => {
+
     runTest()
       .then(() => process.exit(0))
       .catch(err => {

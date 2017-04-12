@@ -11,6 +11,7 @@ const
   , draft = args.includes('--draft')
   , prerelease = args.includes('--prerelease')
   , publisher = new Publisher(owner, repo, tag)
+  , ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null
 
 fs.readFile('./CHANGELOG.md.tmp', 'utf8', (err, changelog) => {
   if (err) {
@@ -18,7 +19,7 @@ fs.readFile('./CHANGELOG.md.tmp', 'utf8', (err, changelog) => {
     process.exit(1)
   }
 
-  publisher.publish(changelog, draft, prerelease)
+  publisher.publish(changelog, draft, prerelease, ghToken)
     .then(res => {
       console.log(`\x1b[32mSuccessfully published: ${res.html_url}\x1b[0m`)
     })

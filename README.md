@@ -19,7 +19,7 @@ Clone this repository in the repository you want to release.
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md
+    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token>
     $ cat CHANGELOG.md
 ```
 
@@ -74,7 +74,7 @@ You must fill the compat.json to specify which version of kuzzle and proxy you w
 To publish a release on github run the publish.js script
 
 ```
-    $ node publish.js --tag <the tag to release>
+    $ node publish.js --tag <the tag to release> --gh-token <your github token>
 ```
 
 It will create a tag on github with the last changelog as body.

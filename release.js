@@ -5,9 +5,9 @@ const exec = require('child_process').exec
   , Generator = require('./lib/changelog-gen/generator')
   , Branch = require('./lib/release-mgr/branch')
   , prerequisite = require('./lib/prerequisite')
-  , testEnv = require('./lib/release-mgr/test-env')
+  , TestEnvironment = require('./lib/release-mgr/test-env')
   , bumper = require('./lib/release-mgr/bumper')
-  , pr = require('./lib/release-mgr/pull-request')
+  , PullRequest = require('./lib/release-mgr/pull-request')
   , compat = require('./compat.json')
   , ask = require('./lib/ask')
   , crypto = require('crypto')
@@ -105,11 +105,14 @@ const makeChangelog = () => {
   })
 }
 
-const runTest = () => {
+const runTest = (branch, testEnv) => {
   let changelog
     , sha
     , travisBuild
     , buildId
+
+  const
+    pr = new PullRequest(owner, repo, tag, ghToken)
 
   return branch.getCurrent()
     .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
@@ -125,13 +128,13 @@ const runTest = () => {
       return bumper.bumpVersion(tag, jsonPackage)
     })
     .then(() => branch.push(tag))
-    .then(() => pr.create(owner, repo, ghToken, tag, changelog))
+    .then(() => pr.create(changelog))
     .then(issue => {
       sha = issue.head.sha
 
-      return pr.updateLabels(owner, repo, issue.number, ghToken)
+      return pr.updateLabels(issue.number)
     })
-    .then(() => testEnv.getBuildNumber(envTestBranchName, ghToken))
+    .then(() => testEnv.getBuildNumber(envTestBranchName))
     .then(build => {
       travisBuild = build.replace('\n', '')
 
@@ -140,17 +143,20 @@ const runTest = () => {
     .then(id => {
       buildId = id
 
-      return pr.updateStatus(owner, repo, sha, 'pending', ghToken, buildId)
+      return pr.updateStatus(sha, 'pending', buildId)
     })
-    .then(() => testEnv.streamLog(ghToken, travisBuild))
-    .then(res => pr.updateStatus(owner, repo, sha, res.status, ghToken, buildId))
+    .then(() => testEnv.streamLog(travisBuild))
+    .then(res => pr.updateStatus(sha, res.status, buildId))
 }
 
 // Let's run everything
 prerequisite.hasTestEnv()
   .then(() => {
+    const
+      branch = new Branch(tag)
+      , testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
 
-    runTest()
+    runTest(branch, testEnv)
       .then(() => process.exit(0))
       .catch(err => {
         if (err) {

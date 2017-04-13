@@ -15,7 +15,7 @@ const exec = require('child_process').exec
   , repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
   , owner = repoInfo[1]
   , repo = repoInfo[2]
-  , envTestBranchName = crypto.createHmac('sha256', 'kuzzlerox').digest('hex')
+  , envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
 
   let ghToken
     , toTag
@@ -40,6 +40,11 @@ if (args.includes('--help')) {
   help()
   process.exit(1)
 }
+
+process.on('exit', () => {
+  testEnv.deleteProposalBranch(envTestBranchName)
+  branch.delete(`${tag}-proposal`)
+})
 
 const writeChangelog = (changeLog, file) => {
   return new Promise((resolve, reject) => {
@@ -109,9 +114,12 @@ const prepareRelease = () => {
     .then(() => makeChangelog())
     .then((changes) => {
       changelog = changes
+
       return bumper.bumpVersion(tag, jsonPackage)
     })
     .then(() => branch.push(tag))
+    .then(() => pr.create(owner, repo, ghToken, tag, changelog))
+    .then(issue => pr.updateLabels(owner, repo, issue.number, ghToken))
 }
 
 const runTest = () => {
@@ -122,8 +130,6 @@ const runTest = () => {
     .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
     .then(() => testEnv.streamLog(ghToken, envTestBranchName))
-    .then(() => testEnv.deleteProposalBranch(envTestBranchName))
-    .catch((err) => testEnv.deleteProposalBranch(envTestBranchName))
 }
 
 // Let's run everything

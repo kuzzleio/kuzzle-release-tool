@@ -16,7 +16,8 @@
       "Enhancements"
     ]
   },
-  "travis": {
+  "ci": {
+    "api": "https://api.travis-ci.org",
     "totalRetry": "500",
     "retryInterval": "500"
   }

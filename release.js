@@ -43,6 +43,11 @@ if (args.includes('--help')) {
   process.exit(1)
 }
 
+process.on('exit', () => {
+  testEnv.deleteProposalBranch(envTestBranchName)
+  branch.delete(`${tag}-proposal`)
+})
+
 const writeChangelog = (changeLog, file) => {
   return new Promise((resolve, reject) => {
     prependFile(file, changeLog, 'utf8', err => {

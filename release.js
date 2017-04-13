@@ -1,13 +1,13 @@
 const exec = require('child_process').exec
   , jsonPackage = require('../package.json')
   , prependFile = require('prepend-file')
-  , reader = require('./lib/changelog-gen/reader')
-  , generator = require('./lib/changelog-gen/generator')
-  , branch = require('./lib/release-mgr/branch')
+  , Reader = require('./lib/changelog-gen/reader')
+  , Generator = require('./lib/changelog-gen/generator')
+  , Branch = require('./lib/release-mgr/branch')
   , prerequisite = require('./lib/prerequisite')
-  , testEnv = require('./lib/release-mgr/test-env')
+  , TestEnvironment = require('./lib/release-mgr/test-env')
   , bumper = require('./lib/release-mgr/bumper')
-  , pr = require('./lib/release-mgr/pull-request')
+  , PullRequest = require('./lib/release-mgr/pull-request')
   , compat = require('./compat.json')
   , ask = require('./lib/ask')
   , crypto = require('crypto')
@@ -44,11 +44,6 @@ if (args.includes('--help')) {
   process.exit(1)
 }
 
-process.on('exit', () => {
-  testEnv.deleteProposalBranch(envTestBranchName)
-  branch.delete(`${tag}-proposal`)
-})
-
 const writeChangelog = (changeLog, file) => {
   return new Promise((resolve, reject) => {
     prependFile(file, changeLog, 'utf8', err => {
@@ -75,15 +70,17 @@ const makeChangelog = () => {
 
       let prs = stdout.split('\n')
       let promises = []
+      const generator = new Generator(owner, repo, tag, ghToken)
+        , reader = new Reader(owner, repo, ghToken)
 
       prs.forEach(id => {
         if (id) {
-          promises.push(reader.readFromGithub(owner, repo, id, ghToken))
+          promises.push(reader.readFromGithub(id))
         }
       })
 
       Promise.all(promises)
-        .then(result => generator.generate(owner, repo, tag, jsonPackage.version, result))
+        .then(result => generator.generate(jsonPackage.version, result))
         .then(changeLog => {
           fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
             if (err) {
@@ -108,11 +105,14 @@ const makeChangelog = () => {
   })
 }
 
-const runTest = () => {
+const runTest = (branch, testEnv) => {
   let changelog
     , sha
     , travisBuild
     , buildId
+
+  const
+    pr = new PullRequest(owner, repo, tag, ghToken)
 
   return branch.getCurrent()
     .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
@@ -128,13 +128,13 @@ const runTest = () => {
       return bumper.bumpVersion(tag, jsonPackage)
     })
     .then(() => branch.push(tag))
-    .then(() => pr.create(owner, repo, ghToken, tag, changelog))
+    .then(() => pr.create(changelog))
     .then(issue => {
       sha = issue.head.sha
 
-      return pr.updateLabels(owner, repo, issue.number, ghToken)
+      return pr.updateLabels(issue.number)
     })
-    .then(() => testEnv.getBuildNumber(envTestBranchName, ghToken))
+    .then(() => testEnv.getBuildNumber(envTestBranchName))
     .then(build => {
       travisBuild = build.replace('\n', '')
 
@@ -143,16 +143,20 @@ const runTest = () => {
     .then(id => {
       buildId = id
 
-      return pr.updateStatus(owner, repo, sha, 'pending', ghToken, buildId)
+      return pr.updateStatus(sha, 'pending', buildId)
     })
-    .then(() => testEnv.streamLog(ghToken, travisBuild))
-    .then(res => pr.updateStatus(owner, repo, sha, res.status, ghToken, buildId))
+    .then(() => testEnv.streamLog(travisBuild))
+    .then(res => pr.updateStatus(sha, res.status, buildId))
 }
 
 // Let's run everything
 prerequisite.hasTestEnv()
   .then(() => {
-    runTest()
+    const
+      branch = new Branch(tag)
+      , testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
+
+    runTest(branch, testEnv)
       .then(() => process.exit(0))
       .catch(err => {
         if (err) {

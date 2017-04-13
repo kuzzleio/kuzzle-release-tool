@@ -112,9 +112,6 @@ const prepareRelease = () => {
       return bumper.bumpVersion(tag, jsonPackage)
     })
     .then(() => branch.push(tag))
-    .then(() => pr.create(owner, repo, ghToken, tag, changelog)
-    )
-    // .then(() => branch.delete(tag))
 }
 
 const runTest = () => {

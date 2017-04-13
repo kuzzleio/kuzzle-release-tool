@@ -1,30 +1,30 @@
 const exec = require('child_process').exec,
-   jsonPackage = require('../package.json'),
-   prependFile = require('prepend-file'),
-   Reader = require('./lib/changelog-gen/reader'),
-   Generator = require('./lib/changelog-gen/generator'),
-   Branch = require('./lib/release-mgr/branch'),
-   prerequisite = require('./lib/prerequisite'),
-   TestEnvironment = require('./lib/release-mgr/test-env'),
-   bumper = require('./lib/release-mgr/bumper'),
-   PullRequest = require('./lib/release-mgr/pull-request'),
-   compat = require('./compat.json'),
-   ask = require('./lib/ask'),
-   crypto = require('crypto'),
-   fs = require('fs'),
-   args = process.argv.slice(2),
-   repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
-   owner = repoInfo[1],
-   repo = repoInfo[2],
-   envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
+  jsonPackage = require('../package.json'),
+  prependFile = require('prepend-file'),
+  Reader = require('./lib/changelog-gen/reader'),
+  Generator = require('./lib/changelog-gen/generator'),
+  Branch = require('./lib/release-mgr/branch'),
+  prerequisite = require('./lib/prerequisite'),
+  TestEnvironment = require('./lib/release-mgr/test-env'),
+  bumper = require('./lib/release-mgr/bumper'),
+  PullRequest = require('./lib/release-mgr/pull-request'),
+  compat = require('./compat.json'),
+  ask = require('./lib/ask'),
+  crypto = require('crypto'),
+  fs = require('fs'),
+  args = process.argv.slice(2),
+  repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
+  owner = repoInfo[1],
+  repo = repoInfo[2],
+  envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
 
-  const
-    ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
-     toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
-     fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
-     tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-     outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
-     noCleanup = args.includes('--no-cleanup')
+const
+  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
+  toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
+  fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
+  tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
+  outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
+  noCleanup = args.includes('--no-cleanup')
 
 const help = () => {
   console.log('usage:')
@@ -71,7 +71,7 @@ const makeChangelog = () => {
       let prs = stdout.split('\n')
       let promises = []
       const generator = new Generator(owner, repo, tag, ghToken),
-         reader = new Reader(owner, repo, ghToken)
+        reader = new Reader(owner, repo, ghToken)
 
       prs.forEach(id => {
         if (id) {
@@ -107,9 +107,9 @@ const makeChangelog = () => {
 
 const runTest = (branch, testEnv) => {
   let changelog,
-     sha,
-     travisBuild,
-     buildId
+    sha,
+    travisBuild,
+    buildId
 
   const
     pr = new PullRequest(owner, repo, tag, ghToken)
@@ -154,7 +154,7 @@ prerequisite.hasTestEnv()
   .then(() => {
     const
       branch = new Branch(tag),
-       testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
+      testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
 
     runTest(branch, testEnv)
       .then(() => process.exit(0))

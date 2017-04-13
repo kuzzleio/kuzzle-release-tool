@@ -1,4 +1,4 @@
-Tool to auto generate a changelog from 2 branches of any repository and auto release it on github (todo)
+Tool to auto generate a changelog from 2 branches of any repository and auto release it on github
 
 ## Usage
 
@@ -19,7 +19,7 @@ Clone this repository in the repository you want to release.
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md
+    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token>
     $ cat CHANGELOG.md
 ```
 
@@ -68,3 +68,13 @@ This script follows the following steps to make a release:
 - Update custom status of the kuzzle-test-environment travis job on the release request
 
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
+
+## Publish a release on github
+
+To publish a release on github run the publish.js script
+
+```
+    $ node publish.js --tag <the tag to release> --gh-token <your github token>
+```
+
+It will create a tag on github with the last changelog as body.

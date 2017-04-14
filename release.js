@@ -112,10 +112,9 @@ const makeChangelog = () => {
             if (outputFile) {
               return writeChangelog(changeLog, outputFile)
                 .then(() => resolve(changeLog))
-            } else {
-              console.log(`\x1b[33m${changeLog}\x1b[0m`)
-              resolve(changeLog)
             }
+            console.log(`\x1b[33m${changeLog}\x1b[0m`)
+            resolve(changeLog)
           })
         })
         .catch(err => {
@@ -138,7 +137,7 @@ const runTest = (branch, testEnv) => {
     pr = new PullRequest(owner, repo, tag, ghToken)
 
   return branch.getCurrent()
-    .then(branch => ask(`You are about to make a release based on branch ${branch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
+    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
     .then(() => testEnv.reviewTravisYml())
     .then(() => testEnv.createProposalBranch(envTestBranchName))
     .then(() => testEnv.writeMatrix())

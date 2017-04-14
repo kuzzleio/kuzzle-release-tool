@@ -1,5 +1,4 @@
 const
-  config = require('./config.json'),
   args = process.argv.slice(2),
   jsonPackage = require('../package.json'),
   fs = require('fs'),
@@ -23,8 +22,8 @@ fs.readFile('./CHANGELOG.md.tmp', 'utf8', (err, changelog) => {
     .then(res => {
       console.log(`\x1b[32mSuccessfully published: ${res.html_url}\x1b[0m`)
     })
-    .catch(err => {
-      console.error(`\x1b[31mAn error occured: ${err.message}\x1b[0m`)
+    .catch(err2 => {
+      console.error(`\x1b[31mAn error occured: ${err2.message}\x1b[0m`)
       process.exit(1)
     })
 })

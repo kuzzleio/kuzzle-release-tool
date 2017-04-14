@@ -39,6 +39,29 @@ const help = () => {
   console.log('       --no-cleanup  Do not delete local and remote branches if the script fails')
 }
 
+const dryRun = () => {
+  const
+    branch = new Branch(tag),
+    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
+
+  return prerequisite.hasTestEnv()
+    .then(() => branch.getCurrent())
+    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nPlease confirm (Y|n) `))
+    .then(() => testEnv.reviewTravisYml())
+    .then(() => testEnv.writeMatrix())
+    .then(() => makeChangelog())
+    .catch(err => {
+      if (err) {
+        console.error(`\x1b[31m${err}\x1b[0m`)
+      }
+      if (!noCleanup) {
+        // Clean up
+        testEnv.deleteProposalBranch(envTestBranchName)
+        branch.delete(`${tag}`)
+      }
+    })
+}
+
 if (args.includes('--help')) {
   help()
   process.exit(1)
@@ -90,7 +113,7 @@ const makeChangelog = () => {
               return writeChangelog(changeLog, outputFile)
                 .then(() => resolve(changeLog))
             } else {
-              console.log(changeLog)
+              console.log(`\x1b[33m${changeLog}\x1b[0m`)
               resolve(changeLog)
             }
           })
@@ -149,26 +172,36 @@ const runTest = (branch, testEnv) => {
     .then(res => pr.updateStatus(sha, res.status, buildId))
 }
 
+const run = () => {
 // Let's run everything
-prerequisite.hasTestEnv()
-  .then(() => {
-    const
-      branch = new Branch(tag),
-      testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
+  prerequisite.hasTestEnv()
+    .then(() => {
+      const
+        branch = new Branch(tag),
+        testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
 
-    runTest(branch, testEnv)
-      .then(() => process.exit(0))
-      .catch(err => {
-        if (err) {
-          console.error(`\x1b[31m${err}\x1b[0m`)
-        }
-        if (!noCleanup) {
-          // Clean up
-          testEnv.deleteProposalBranch(envTestBranchName)
-          branch.delete(`${tag}`)
-        }
-      })
-  })
-  .catch(() => {
-    console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive')
-  })
+      runTest(branch, testEnv)
+        .then(() => process.exit(0))
+        .catch(err => {
+          if (err) {
+            console.error(`\x1b[31m${err}\x1b[0m`)
+          }
+          if (!noCleanup) {
+            // Clean up
+            testEnv.deleteProposalBranch(envTestBranchName)
+            branch.delete(`${tag}`)
+          }
+        })
+    })
+    .catch(() => {
+      console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive')
+    })
+}
+
+if (args.includes('--dry-run')) {
+  dryRun()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1))
+} else {
+  run()
+}

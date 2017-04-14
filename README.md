@@ -13,7 +13,7 @@ Clone this repository in the repository you want to release.
 | --dry-run  | Generate changelog but do not release
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
-| --output   | Do not delete created branches if error
+| --no-cleanup   | Do not delete created branches if error
 
 ## Usage example
 

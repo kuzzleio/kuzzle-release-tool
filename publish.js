@@ -1,6 +1,5 @@
 const
-  args = process.argv.slice(2),
-  jsonPackage = require('../package.json'),
+  args = process.argv.slice(2)
   fs = require('fs'),
   repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
   owner = repoInfo[1],
@@ -10,7 +9,9 @@ const
   draft = args.includes('--draft'),
   prerelease = args.includes('--prerelease'),
   publisher = new Publisher(owner, repo, tag),
-  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null
+  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
+  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null,
+  jsonPackage = require(`${projectPath}/package.json`)
 
 fs.readFile('./CHANGELOG.md.tmp', 'utf8', (err, changelog) => {
   if (err) {

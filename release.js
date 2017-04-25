@@ -19,11 +19,13 @@ const exec = require('child_process').exec,
   tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
   outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
   noCleanup = args.includes('--no-cleanup'),
-  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null,
-  jsonPackage = require(`${projectPath}/package.json`),
-  repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
-  owner = repoInfo[1],
-  repo = repoInfo[2]
+  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null
+
+let
+  jsonPackage,
+  repoInfo,
+  owner,
+  repo
 
 const help = () => {
   console.log('usage:')
@@ -82,6 +84,11 @@ if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
   help()
   process.exit(1)
 }
+
+jsonPackage = require(`${projectPath}/package.json`)
+repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
+owner = repoInfo[1]
+repo = repoInfo[2]
 
 const makeChangelog = () => {
   return new Promise((resolve, reject) => {

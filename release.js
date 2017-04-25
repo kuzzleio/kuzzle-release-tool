@@ -85,7 +85,7 @@ if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
 
 const makeChangelog = () => {
   return new Promise((resolve, reject) => {
-    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
+    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
         console.error(error)
         return

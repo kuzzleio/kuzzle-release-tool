@@ -20,7 +20,7 @@ Clone this repository in the repository you want to release.
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token> --project-path ~/Projects/kuzzle
+    $ node release.js --from 2.X --to master --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token> --project-path ~/Projects/kuzzle
     $ cat CHANGELOG.md
 ```
 

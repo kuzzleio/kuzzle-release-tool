@@ -1,5 +1,4 @@
 const exec = require('child_process').exec,
-  jsonPackage = require('../package.json'),
   prependFile = require('prepend-file'),
   Reader = require('./lib/changelog-gen/reader'),
   Generator = require('./lib/changelog-gen/generator'),
@@ -13,35 +12,38 @@ const exec = require('child_process').exec,
   crypto = require('crypto'),
   fs = require('fs'),
   args = process.argv.slice(2),
-  repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
-  owner = repoInfo[1],
-  repo = repoInfo[2],
-  envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex')
-
-const
+  envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex'),
   ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
   toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
   fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
   tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
   outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
-  noCleanup = args.includes('--no-cleanup')
+  noCleanup = args.includes('--no-cleanup'),
+  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null
+
+let
+  jsonPackage,
+  repoInfo,
+  owner,
+  repo
 
 const help = () => {
   console.log('usage:')
-  console.log('       --from        The git tag you want to start the release from')
-  console.log('       --to          The git tag you want to stop the release to')
-  console.log('       --tag         Tag to release')
-  console.log('       --gh-token    Your github token')
+  console.log('       --from         The git tag you want to start the release from')
+  console.log('       --to           The git tag you want to stop the release to')
+  console.log('       --tag          Tag to release')
+  console.log('       --gh-token     Your github token')
+  console.log('       --project-path Path of the project to release')
   console.log('\noptional:')
-  console.log('       --help        Show this help')
-  console.log('       --dry-run     Generate changelog and run tests but do not release')
-  console.log('       --output      Changelog file (stdout will be used if this option is not set)')
-  console.log('       --no-cleanup  Do not delete local and remote branches if the script fails')
+  console.log('       --help         Show this help')
+  console.log('       --dry-run      Generate changelog and run tests but do not release')
+  console.log('       --output       Changelog file (stdout will be used if this option is not set)')
+  console.log('       --no-cleanup   Do not delete local and remote branches if the script fails')
 }
 
 const dryRun = () => {
   const
-    branch = new Branch(tag),
+    branch = new Branch(tag, projectPath),
     testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
 
   return prerequisite.hasTestEnv()
@@ -78,14 +80,19 @@ const writeChangelog = (changeLog, file) => {
   })
 }
 
-if (!tag || !toTag || !fromTag) {
+if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
   help()
   process.exit(1)
 }
 
+jsonPackage = require(`${projectPath}/package.json`)
+repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
+owner = repoInfo[1]
+repo = repoInfo[2]
+
 const makeChangelog = () => {
   return new Promise((resolve, reject) => {
-    exec(`cd ../ && git fetch ; git log --abbrev-commit origin/${fromTag}..origin/${toTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
+    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
         console.error(error)
         return
@@ -147,7 +154,7 @@ const runTest = (branch, testEnv) => {
     .then((changes) => {
       changelog = changes
 
-      return bumper.bumpVersion(tag, jsonPackage)
+      return bumper.bumpVersion(tag, jsonPackage, `${projectPath}/package.json`)
     })
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
@@ -176,7 +183,7 @@ const run = () => {
   prerequisite.hasTestEnv()
     .then(() => {
       const
-        branch = new Branch(tag),
+        branch = new Branch(tag, projectPath),
         testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
 
       runTest(branch, testEnv)

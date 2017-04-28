@@ -14,12 +14,13 @@ Clone this repository in the repository you want to release.
 | --gh-token | Your github token
 | --output   | Changelog file (stdout will be used if this option is not set)
 | --no-cleanup   | Do not delete created branches if error
+| --project-path | Specify where is the project to release
 
 ## Usage example
 
 ```
     $ npm i
-    $ node release.js --from master --to 2.x --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token>
+    $ node release.js --from 2.X --to master --tag 2.1.0 --output ../CHANGELOG.md --gh-token <Your github token> --project-path ~/Projects/kuzzle
     $ cat CHANGELOG.md
 ```
 

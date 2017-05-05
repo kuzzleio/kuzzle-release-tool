@@ -75,7 +75,7 @@ You must fill the compat.json to specify which version of kuzzle and proxy you w
 To publish a release on github run the publish.js script
 
 ```
-    $ node publish.js --tag <the tag to release> --gh-token <your github token>
+    $ node publish.js --tag <the tag to release> --gh-token <your github token> --project-path ~/Projects/kuzzle
 ```
 
 It will create a tag on github with the last changelog as body.

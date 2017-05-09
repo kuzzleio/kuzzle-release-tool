@@ -7,11 +7,11 @@ const
   prerelease = args.includes('--prerelease'),
   ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
   projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null,
-  publisher = new Publisher(owner, repo, tag, ghToken),
   jsonPackage = require(`${projectPath}/package.json`),
   repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url),
   owner = repoInfo[1],
-  repo = repoInfo[2]
+  repo = repoInfo[2],
+  publisher = new Publisher(owner, repo, tag, ghToken)
 
   fs.readFile('./CHANGELOG.md.tmp', 'utf8', (err, changelog) => {
   if (err) {

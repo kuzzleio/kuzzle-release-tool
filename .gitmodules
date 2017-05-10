@@ -1,0 +1,3 @@
+[submodule "kuzzle-test-environment"]
+	path = kuzzle-test-environment
+	url = git@github.com:kuzzleio/kuzzle-test-environment.git

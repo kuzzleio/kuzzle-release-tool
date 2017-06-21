@@ -13,11 +13,6 @@ const
   crypto = require('crypto'),
   fs = require('fs');
 
-if (args.includes('--help')) {
-  help();
-  process.exit(1);
-}
-
 const
   args = process.argv.slice(2),
   envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex'),
@@ -29,26 +24,38 @@ const
   noCleanup = args.includes('--no-cleanup'),
   projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
 
+if (args.includes('--help')) {
+  help();
+  process.exit(1);
+}
+
 if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
   help();
   process.exit(1);
 }
 
-const jsonPackage = require(`${projectPath}/package.json`);
-let owner, repo;
+let owner, repo, packageInfo;
 
-if (args.includes('--dry-run')) {
-  getRepoInfo()
-    .then(info => {
-      [repo, owner] = info;
+getProjectInfo()
+  .then(info => {
+    packageInfo = info;
+    return getRepoInfo();
+  })
+  .then(info => {
+    ({owner, repo} = info);
 
+    if (args.includes('--dry-run')) {
       return dryRun();
-    })
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
-} else {
-  run();
-}
+    }
+
+    return run();
+  })
+  .then(() => process.exit(0))
+  .catch(error => {
+    const message = error instanceof Error ? error.message : error;
+    console.error(`\x1b[31m${message}\x1b[0m`);
+    process.exit(1);
+  });
 
 function help () {
   console.log('usage:');
@@ -76,14 +83,13 @@ function dryRun () {
     .then(() => testEnv.writeMatrix())
     .then(() => makeChangelog())
     .catch(err => {
-      if (err) {
-        console.error(`\x1b[31m${err}\x1b[0m`);
-      }
       if (!noCleanup) {
         // Clean up
         testEnv.deleteProposalBranch(envTestBranchName);
         branch.delete(`${tag}`);
       }
+
+      return Promise.reject(err);
     });
 }
 
@@ -102,28 +108,28 @@ function makeChangelog () {
   return new Promise((resolve, reject) => {
     exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit ${toTag}..${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
-        console.error(error);
-        return;
+        return reject(error);
       }
 
-      let prs = stdout.split('\n');
-      let promises = [];
-      const generator = new Generator(owner, repo, tag, ghToken),
+      const 
+        promises = [],
+        generator = new Generator(owner, repo, tag, ghToken),
         reader = new Reader(owner, repo, ghToken);
 
-      prs.forEach(id => {
+      stdout.split('\n').forEach(id => {
         if (id) {
           promises.push(reader.readFromGithub(id));
         }
       });
 
       Promise.all(promises)
-        .then(result => generator.generate(jsonPackage.version, result))
+        .then(result => generator.generate(packageInfo.version, result))
         .then(changeLog => {
           fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
             if (err) {
               return reject(err);
             }
+
             if (outputFile) {
               return writeChangelog(changeLog, outputFile)
                 .then(() => resolve(changeLog));
@@ -132,12 +138,7 @@ function makeChangelog () {
             resolve(changeLog);
           });
         })
-        .catch(err => {
-          if (err) {
-            console.error(err);
-          }
-          reject();
-        });
+        .catch(err => reject(err));
     });
   });
 }
@@ -159,7 +160,7 @@ function runTest (branch, testEnv) {
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
     .then(() => branch.create(tag))
     .then(() => makeChangelog())
-    .then((changes) => {
+    .then(changes => {
       changelog = changes;
 
       return bumper.bumpVersion(tag, jsonPackage, `${projectPath}/package.json`);
@@ -197,21 +198,22 @@ function run () {
       runTest(branch, testEnv)
         .then(() => process.exit(0))
         .catch(err => {
-          if (err) {
-            console.error(`\x1b[31m${err}\x1b[0m`);
-          }
           if (!noCleanup) {
             // Clean up
             testEnv.deleteProposalBranch(envTestBranchName);
             branch.delete(`${tag}`);
           }
+
+          return Promise.reject(err);
         });
-    })
-    .catch(() => {
-      console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive');
     });
 }
 
+/**
+ * Gets the repository name and owner of a project
+ * 
+ * @return {object} 
+ */
 function getRepoInfo () {
   return new Promise((resolve, reject) => {
     exec(`cd ${projectPath} && git remote get-url origin`, (error, stdout) => {
@@ -225,7 +227,68 @@ function getRepoInfo () {
         return reject(new Error(`Unable to parse the following GIT URL: ${stdout.trim()}\nMake sure the project git remote URL is set`));
       }
 
-      resolve([parsed[1], parsed[2]]);
+      resolve({owner: parsed[1], repo: parsed[2]});
     });
+  });
+}
+
+
+/**
+ * Detects the project information file, parse it and return
+ * relevant informations
+ * 
+ * @return {object} 
+ */
+function getProjectInfo () {
+  const files = [
+    {name: 'package.json', type: 'nodejs'},
+    {name: 'composer.json', type: 'php'},
+    {name: 'build.gradle', type: 'android'}
+  ];
+
+  return new Promise((resolve, reject) => {
+    for (const file of files) {
+      const fullpath = `${projectPath}/${file.name}`;
+      
+      try {
+        fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
+      }
+      catch(e) {
+        // ignore exception and continue with next file check
+        continue;
+      }
+ 
+      let version;
+
+      if (['nodejs', 'php'].includes(file.type)) {
+        version = require(fullpath).version;
+      }
+      else {
+        // for now, there is only android project left
+        // other cases might be added later
+        let content;
+     
+        try {
+          content = fs.readFileSync(fullpath, 'utf8');
+        }
+        catch (error) {
+          return reject(new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`));
+        }
+
+        version = content
+          .split('\n')
+          .filter(line => line.match(/^version\s*=\s*\"/))
+          .map(line => line.replace(/^version\s*=\s*\"(.*?)\"/, '$1'))[0];
+      }
+
+      return resolve({
+        version,
+        type: file.type,
+        name: file.name,
+        path: fullpath
+      });
+    }
+
+    reject(new Error(`No project file found in ${projectPath}`));
   });
 }

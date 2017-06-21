@@ -7,8 +7,8 @@ Clone this repository in the repository you want to release.
 | Options    | Description
 |------------|----------------------------------------------------------------
 | --help     | Show help
-| --from     | The git tag you want to start the release from
-| --to       | The git tag you want to stop the release to
+| --from     | The git tag / branch you want to start the release from
+| --to       | The git tag / branch you want to stop the release to
 | --tag      | Tag to release
 | --dry-run  | Generate changelog but do not release
 | --gh-token | Your github token

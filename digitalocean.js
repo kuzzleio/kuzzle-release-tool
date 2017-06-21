@@ -3,11 +3,13 @@ const
   token = args.includes('--token') ? args[args.indexOf('--token') + 1] : null,
   version = args.includes('--version') ? args[args.indexOf('--version') + 1] : null,
   digitalocean = require('digitalocean'),
-  async = require('async');
+  async = require('async'),
+  regionSlug = 'ams2',
+  request = require('request-promise')
 
 let
-  dropletId = null,
-  snapshotId = null;
+  dropletId = '52227345',
+  dropletIp = null
 
 const help = () => {
   console.log('usage:')
@@ -31,19 +33,17 @@ function createDroplet () {
   let dropletStatus = null
   const attributes = {
     name: 'automatic-snapshot',
-    region: 'ams2',
+    region: regionSlug,
     size: '4gb',
     image: '25615166',
     user_data: `
 #cloud-config
 
 runcmd:
-  - sudo sysctl -w vm.max_map_count=262144
-  - cd ~
-  - wget http://kuzzle.io/docker-compose.yml
-  - sudo wget https://gist.githubusercontent.com/AnthonySendra/8a816ae7b7a79b20d470422f4dfa7c29/raw/a43caa243c7950b150436145b8444cc351131a4b/kuzzle.service
-  - sudo mv /kuzzle.service /lib/systemd/system/kuzzle.service
-  - systemctl start kuzzle
+  - sudo echo "vm.max_map_count=262144" >> /etc/sysctl.conf
+  - wget -O /root/docker-compose.yml http://kuzzle.io/docker-compose.yml
+  - sudo wget -O /root/kuzzle.service https://gist.githubusercontent.com/AnthonySendra/8a816ae7b7a79b20d470422f4dfa7c29/raw/31e2666f6c5a7d7bc69850ff8bd8563a5288dbe9/kuzzle.service
+  - sudo mv /root/kuzzle.service /lib/systemd/system/kuzzle.service
   - systemctl enable kuzzle
 `
   }
@@ -60,6 +60,7 @@ runcmd:
           (callback) => {
             client.droplets.get(dropletId)
               .then(newDroplet => {
+                dropletIp = newDroplet.networks.v4[0].ip_address
                 dropletStatus = newDroplet.status
                 callback(null, dropletStatus)
               })
@@ -76,67 +77,46 @@ runcmd:
   })
 }
 
+function waitingInstall() {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve()
+    }, 120000)
+  })
+}
+
 function createSnapshot () {
-  let snapshotStatus = null
+  let snapshotCount = 0
   console.log('CREATING SNAPSHOT')
 
   return new Promise((resolve, reject) => {
-    client.droplets.snapshot(dropletId, {type: 'snapshot', name: `kuzzle-${version}`})
-      .then((snapshot) => {
-        console.log(snapshot)
-        snapshotId = snapshot.id
-        snapshotStatus = snapshot.status
-
+    client.droplets.snapshot(dropletId, {type: 'snapshot', name: `kuzzle-${regionSlug}-${version}-${Date.now()}`})
+      .then(() => {
         async.whilst(
-          () => snapshotStatus === 'in-progress',
+          () => snapshotCount === 0,
           (callback) => {
-            client.snapshots.get(snapshotId)
-              .then(newSnapshot => {
-                snapshotStatus = newSnapshot.status
-                callback(null, snapshotStatus)
+            console.log('WAITING FOR SNAPSHOT CREATION')
+            client.droplets.snapshots(dropletId, 1 , 1)
+              .then(response => {
+                setTimeout(() => {
+                  snapshotCount = response._digitalOcean.body.meta.total
+                  callback(null, snapshotCount)
+                }, 5000)
               })
           },
-          (err, status) => {
-            if (!err && status === 'completed') {
-              resolve()
-            } else {
-              reject(err)
-            }
-          }
+          err => err ? reject(err) : resolve()
         )
       })
   })
 }
 
-function destroyDroplet() {
+function deleteDroplet() {
   console.log('DESTROYING DROPLET')
-  let dropletStatus = null
-  return new Promise((resolve, reject) => {
-    client.droplets.shutdown(dropletId)
-      .then(info => {
-        dropletStatus = info.status
-
-        async.whilst(
-          () => dropletStatus === 'in-progress',
-          (callback) => {
-            client.snapshots.get(snapshotId)
-              .then(newSnapshot => {
-                dropletStatus = newSnapshot.status
-                callback(null, dropletStatus)
-              })
-          },
-          (err, status) => {
-            if (!err && status === 'completed') {
-              resolve()
-            } else {
-              reject(err)
-            }
-          }
-        )
-      })
-  })
+  return client.droplets.delete(dropletId)
 }
 
 createDroplet()
+  .then(() => waitingInstall())
   .then(() => createSnapshot())
-  .then(() => destroyDroplet())
+  .then(() => deleteDroplet())
+  .catch(e => console.error(e))

@@ -94,12 +94,14 @@ function makeChangelog () {
       Promise.all(promises)
         .then(result => generator.generate(packageInfo.version, result))
         .then(changeLog => {
-          fs.writeFile('RELEASE_CHANGELOG.md', changeLog, 'utf8', err => {
+          const changelogFile = `${owner}.${repo}.CHANGELOG.md`;
+
+          fs.writeFile(changelogFile, changeLog, 'utf8', err => {
             if (err) {
               return reject(err);
             }
 
-            console.log('\x1b[33mCHANGELOG written in RELEASE_CHANGELOG.md\x1b[0m');
+            console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
             resolve(changeLog);
           });
 

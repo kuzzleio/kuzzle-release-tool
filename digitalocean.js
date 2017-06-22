@@ -4,17 +4,17 @@ const
   version = args.includes('--version') ? args[args.indexOf('--version') + 1] : null,
   digitalocean = require('digitalocean'),
   async = require('async'),
-  regionSlug = 'ams2',
+  regionSlug = args.includes('--region') ? args[args.indexOf('--region') + 1] : 'ams2',
   request = require('request-promise')
 
 let
-  dropletId = '52227345',
-  dropletIp = null
+  dropletId = '52227345'
 
 const help = () => {
   console.log('usage:')
   console.log('       --token        Your own DigitalOcean access token')
   console.log('       --version      Last Kuzzle version')
+  console.log('       --region       Region slug. Like "ams2", "lon1" (default "ams2")')
 }
 
 if (args.includes('--help')) {
@@ -60,7 +60,6 @@ runcmd:
           (callback) => {
             client.droplets.get(dropletId)
               .then(newDroplet => {
-                dropletIp = newDroplet.networks.v4[0].ip_address
                 dropletStatus = newDroplet.status
                 callback(null, dropletStatus)
               })
@@ -90,7 +89,7 @@ function createSnapshot () {
   console.log('CREATING SNAPSHOT')
 
   return new Promise((resolve, reject) => {
-    client.droplets.snapshot(dropletId, {type: 'snapshot', name: `kuzzle-${regionSlug}-${version}-${Date.now()}`})
+    client.droplets.snapshot(dropletId, {type: 'snapshot', name: `kuzzle-${version}-${regionSlug}`})
       .then(() => {
         async.whilst(
           () => snapshotCount === 0,

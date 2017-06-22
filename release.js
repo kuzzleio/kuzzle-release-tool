@@ -1,18 +1,19 @@
 const 
   exec = require('child_process').exec,
-  prependFile = require('prepend-file'),
   Reader = require('./lib/changelog-gen/reader'),
   Generator = require('./lib/changelog-gen/generator'),
   Branch = require('./lib/release-mgr/branch'),
   prerequisite = require('./lib/prerequisite'),
   TestEnvironment = require('./lib/release-mgr/test-env'),
-  bumper = require('./lib/release-mgr/bumper'),
+  bumpVersion = require('./lib/release-mgr/bumper'),
   PullRequest = require('./lib/release-mgr/pull-request'),
   compat = require('./compat.json'),
   ask = require('./lib/ask'),
   crypto = require('crypto'),
-  fs = require('fs');
+  fs = require('fs'),
+  getRepoInfo = require('./lib/get-repo-info');
 
+// arguments parsing
 const
   args = process.argv.slice(2),
   envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex'),
@@ -20,7 +21,6 @@ const
   toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
   fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
   tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-  outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
   noCleanup = args.includes('--no-cleanup'),
   projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
 
@@ -39,16 +39,12 @@ let owner, repo, packageInfo;
 getProjectInfo()
   .then(info => {
     packageInfo = info;
-    return getRepoInfo();
+    return getRepoInfo(getRepoInfo);
   })
   .then(info => {
     ({owner, repo} = info);
 
-    if (args.includes('--dry-run')) {
-      return dryRun();
-    }
-
-    return run();
+    return run(args.includes('--dry-run'));
   })
   .then(() => process.exit(0))
   .catch(error => {
@@ -56,6 +52,13 @@ getProjectInfo()
     console.error(`\x1b[31m${message}\x1b[0m`);
     process.exit(1);
   });
+
+/*
+ * End of main file code
+ * 
+ * Beyond this point, there should be
+ * only functions declaration
+ */
 
 function help () {
   console.log('usage:');
@@ -67,41 +70,7 @@ function help () {
   console.log('\noptional:');
   console.log('       --help         Show this help');
   console.log('       --dry-run      Generate changelog and run tests but do not release');
-  console.log('       --output       Changelog file (stdout will be used if this option is not set)');
   console.log('       --no-cleanup   Do not delete local and remote branches if the script fails');
-}
-
-function dryRun () {
-  const
-    branch = new Branch(tag, projectPath),
-    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken);
-
-  return prerequisite.hasTestEnv()
-    .then(() => branch.getCurrent())
-    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nPlease confirm (Y|n) `))
-    .then(() => testEnv.reviewTravisYml())
-    .then(() => testEnv.writeMatrix())
-    .then(() => makeChangelog())
-    .catch(err => {
-      if (!noCleanup) {
-        // Clean up
-        testEnv.deleteProposalBranch(envTestBranchName);
-        branch.delete(`${tag}`);
-      }
-
-      return Promise.reject(err);
-    });
-}
-
-function writeChangelog (changeLog, file) {
-  return new Promise((resolve, reject) => {
-    prependFile(file, changeLog, 'utf8', err => {
-      if (err) {
-        return reject(err);
-      }
-      resolve();
-    });
-  });
 }
 
 function makeChangelog () {
@@ -125,26 +94,24 @@ function makeChangelog () {
       Promise.all(promises)
         .then(result => generator.generate(packageInfo.version, result))
         .then(changeLog => {
-          fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
+          fs.writeFile('RELEASE_CHANGELOG.md', changeLog, 'utf8', err => {
             if (err) {
               return reject(err);
             }
 
-            if (outputFile) {
-              return writeChangelog(changeLog, outputFile)
-                .then(() => resolve(changeLog));
-            }
-            console.log(`\x1b[33m${changeLog}\x1b[0m`);
+            console.log('\x1b[33mCHANGELOG written in RELEASE_CHANGELOG.md\x1b[0m');
             resolve(changeLog);
           });
+
+          return null;
         })
         .catch(err => reject(err));
     });
   });
 }
 
-function runTest (branch, testEnv) {
-  let changelog,
+function release (branch, testEnv, changelog) {
+  let 
     sha,
     travisBuild,
     buildId;
@@ -152,19 +119,10 @@ function runTest (branch, testEnv) {
   const
     pr = new PullRequest(owner, repo, tag, ghToken);
 
-  return branch.getCurrent()
-    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
-    .then(() => testEnv.reviewTravisYml())
+  return branch.create(tag)
     .then(() => testEnv.createProposalBranch(envTestBranchName))
-    .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
-    .then(() => branch.create(tag))
-    .then(() => makeChangelog())
-    .then(changes => {
-      changelog = changes;
-
-      return bumper.bumpVersion(tag, jsonPackage, `${projectPath}/package.json`);
-    })
+    .then(() => bumpVersion(packageInfo, tag))
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
     .then(issue => {
@@ -187,51 +145,37 @@ function runTest (branch, testEnv) {
     .then(res => pr.updateStatus(sha, res.status, buildId));
 }
 
-function run () {
+function run (dryRun) {
+  const
+    branch = new Branch(tag, projectPath),
+    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken);
+
   // Let's run everything
-  prerequisite.hasTestEnv()
-    .then(() => {
-      const
-        branch = new Branch(tag, projectPath),
-        testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken);
-
-      runTest(branch, testEnv)
-        .then(() => process.exit(0))
-        .catch(err => {
-          if (!noCleanup) {
-            // Clean up
-            testEnv.deleteProposalBranch(envTestBranchName);
-            branch.delete(`${tag}`);
-          }
-
-          return Promise.reject(err);
-        });
-    });
-}
-
-/**
- * Gets the repository name and owner of a project
- * 
- * @return {object} 
- */
-function getRepoInfo () {
-  return new Promise((resolve, reject) => {
-    exec(`cd ${projectPath} && git remote get-url origin`, (error, stdout) => {
-      if (error) {
-        return reject(error);
+  return prerequisite.hasTestEnv()
+    .then(() => branch.getCurrent())
+    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
+    .then(() => testEnv.reviewTravisYml())
+    .then(() => testEnv.writeMatrix())
+    .then(() => makeChangelog())
+    .then(changelog => {
+      if (dryRun) {
+        console.log('Dry run ended successfully.');
+        return Promise.resolve();
       }
 
-      const parsed = /^.*:(.*?)\/(.*?)\.git$/.exec(stdout.trim());
-
-      if (parsed === null) {
-        return reject(new Error(`Unable to parse the following GIT URL: ${stdout.trim()}\nMake sure the project git remote URL is set`));
+      return release(branch, testEnv, changelog);
+    })
+    .catch(err => {
+      if (!noCleanup) {
+        // Clean up
+        console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
+        testEnv.deleteProposalBranch(envTestBranchName);
+        branch.delete(tag);
       }
 
-      resolve({owner: parsed[1], repo: parsed[2]});
+      return Promise.reject(err);
     });
-  });
 }
-
 
 /**
  * Detects the project information file, parse it and return
@@ -241,9 +185,9 @@ function getRepoInfo () {
  */
 function getProjectInfo () {
   const files = [
-    {name: 'package.json', type: 'nodejs'},
-    {name: 'composer.json', type: 'php'},
-    {name: 'build.gradle', type: 'android'}
+    {name: 'package.json', type: 'json'},
+    {name: 'composer.json', type: 'json'},
+    {name: 'build.gradle', type: 'gradle'}
   ];
 
   return new Promise((resolve, reject) => {
@@ -258,16 +202,15 @@ function getProjectInfo () {
         continue;
       }
  
-      let version;
+      let version, content;
 
-      if (['nodejs', 'php'].includes(file.type)) {
-        version = require(fullpath).version;
+      if (file.type === 'json') {
+        content = require(fullpath);
+        version = content.version;
       }
       else {
-        // for now, there is only android project left
+        // for now, there is only gradle projects left
         // other cases might be added later
-        let content;
-     
         try {
           content = fs.readFileSync(fullpath, 'utf8');
         }
@@ -283,6 +226,7 @@ function getProjectInfo () {
 
       return resolve({
         version,
+        content,
         type: file.type,
         name: file.name,
         path: fullpath

@@ -39,7 +39,7 @@ let owner, repo, packageInfo;
 getProjectInfo()
   .then(info => {
     packageInfo = info;
-    return getRepoInfo(getRepoInfo);
+    return getRepoInfo(projectPath);
   })
   .then(info => {
     ({owner, repo} = info);

@@ -1,213 +1,240 @@
-const exec = require('child_process').exec,
-  prependFile = require('prepend-file'),
+const 
+  exec = require('child_process').exec,
   Reader = require('./lib/changelog-gen/reader'),
   Generator = require('./lib/changelog-gen/generator'),
   Branch = require('./lib/release-mgr/branch'),
   prerequisite = require('./lib/prerequisite'),
   TestEnvironment = require('./lib/release-mgr/test-env'),
-  bumper = require('./lib/release-mgr/bumper'),
+  bumpVersion = require('./lib/release-mgr/bumper'),
   PullRequest = require('./lib/release-mgr/pull-request'),
   compat = require('./compat.json'),
   ask = require('./lib/ask'),
   crypto = require('crypto'),
   fs = require('fs'),
+  getRepoInfo = require('./lib/get-repo-info');
+
+// arguments parsing
+const
   args = process.argv.slice(2),
   envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex'),
   ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
   toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
   fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
   tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-  outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null,
   noCleanup = args.includes('--no-cleanup'),
-  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null
-
-let
-  jsonPackage,
-  repoInfo,
-  owner,
-  repo
-
-const help = () => {
-  console.log('usage:')
-  console.log('       --from         The git tag/branch you want to start the release from')
-  console.log('       --to           The git tag/branch you want to stop the release to')
-  console.log('       --tag          Tag to release')
-  console.log('       --gh-token     Your github token')
-  console.log('       --project-path Path of the project to release')
-  console.log('\noptional:')
-  console.log('       --help         Show this help')
-  console.log('       --dry-run      Generate changelog and run tests but do not release')
-  console.log('       --output       Changelog file (stdout will be used if this option is not set)')
-  console.log('       --no-cleanup   Do not delete local and remote branches if the script fails')
-}
-
-const dryRun = () => {
-  const
-    branch = new Branch(tag, projectPath),
-    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
-
-  return prerequisite.hasTestEnv()
-    .then(() => branch.getCurrent())
-    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nPlease confirm (Y|n) `))
-    .then(() => testEnv.reviewTravisYml())
-    .then(() => testEnv.writeMatrix())
-    .then(() => makeChangelog())
-    .catch(err => {
-      if (err) {
-        console.error(`\x1b[31m${err}\x1b[0m`)
-      }
-      if (!noCleanup) {
-        // Clean up
-        testEnv.deleteProposalBranch(envTestBranchName)
-        branch.delete(`${tag}`)
-      }
-    })
-}
+  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
 
 if (args.includes('--help')) {
-  help()
-  process.exit(1)
-}
-
-const writeChangelog = (changeLog, file) => {
-  return new Promise((resolve, reject) => {
-    prependFile(file, changeLog, 'utf8', err => {
-      if (err) {
-        return reject(err)
-      }
-      resolve()
-    })
-  })
+  help();
+  process.exit(1);
 }
 
 if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
-  help()
-  process.exit(1)
+  help();
+  process.exit(1);
 }
 
-jsonPackage = require(`${projectPath}/package.json`)
-repoInfo = /\/\/[^\/]*\/([^\/]*)\/([^\/]*).git/g.exec(jsonPackage.repository.url)
-owner = repoInfo[1]
-repo = repoInfo[2]
+let owner, repo, packageInfo;
 
-const makeChangelog = () => {
+getProjectInfo()
+  .then(info => {
+    packageInfo = info;
+    return getRepoInfo(projectPath);
+  })
+  .then(info => {
+    ({owner, repo} = info);
+
+    return run(args.includes('--dry-run'));
+  })
+  .then(() => process.exit(0))
+  .catch(error => {
+    const message = error instanceof Error ? error.message : error;
+    console.error(`\x1b[31m${message}\x1b[0m`);
+    process.exit(1);
+  });
+
+/*
+ * End of main file code
+ * 
+ * Beyond this point, there should be
+ * only functions declaration
+ */
+
+function help () {
+  console.log('usage:');
+  console.log('       --from         The git tag/branch you want to start the release from');
+  console.log('       --to           The git tag/branch you want to stop the release to');
+  console.log('       --tag          Tag to release');
+  console.log('       --gh-token     Your github token');
+  console.log('       --project-path Path of the project to release');
+  console.log('\noptional:');
+  console.log('       --help         Show this help');
+  console.log('       --dry-run      Generate changelog and run tests but do not release');
+  console.log('       --no-cleanup   Do not delete local and remote branches if the script fails');
+}
+
+function makeChangelog () {
   return new Promise((resolve, reject) => {
     exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit ${toTag}..${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
-        console.error(error)
-        return
+        return reject(error);
       }
 
-      let prs = stdout.split('\n')
-      let promises = []
-      const generator = new Generator(owner, repo, tag, ghToken),
-        reader = new Reader(owner, repo, ghToken)
+      const 
+        promises = [],
+        generator = new Generator(owner, repo, tag, ghToken),
+        reader = new Reader(owner, repo, ghToken);
 
-      prs.forEach(id => {
+      stdout.split('\n').forEach(id => {
         if (id) {
-          promises.push(reader.readFromGithub(id))
+          promises.push(reader.readFromGithub(id));
         }
-      })
+      });
 
       Promise.all(promises)
-        .then(result => generator.generate(jsonPackage.version, result))
+        .then(result => generator.generate(packageInfo.version, result))
         .then(changeLog => {
-          fs.writeFile('./CHANGELOG.md.tmp', changeLog, err => {
+          const changelogFile = `${owner}.${repo}.CHANGELOG.md`;
+
+          fs.writeFile(changelogFile, changeLog, 'utf8', err => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
-            if (outputFile) {
-              return writeChangelog(changeLog, outputFile)
-                .then(() => resolve(changeLog))
-            }
-            console.log(`\x1b[33m${changeLog}\x1b[0m`)
-            resolve(changeLog)
-          })
+
+            console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
+            resolve(changeLog);
+          });
+
+          return null;
         })
-        .catch(err => {
-          if (err) {
-            console.error(err)
-          }
-          reject()
-        })
-    })
-  })
+        .catch(err => reject(err));
+    });
+  });
 }
 
-const runTest = (branch, testEnv) => {
-  let changelog,
+function release (branch, testEnv, changelog) {
+  let 
     sha,
     travisBuild,
-    buildId
+    buildId;
 
   const
-    pr = new PullRequest(owner, repo, tag, ghToken)
+    pr = new PullRequest(owner, repo, tag, ghToken);
 
-  return branch.getCurrent()
-    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
-    .then(() => testEnv.reviewTravisYml())
+  return branch.create(tag)
     .then(() => testEnv.createProposalBranch(envTestBranchName))
-    .then(() => testEnv.writeMatrix())
     .then(() => testEnv.pushProposalBranch(envTestBranchName))
-    .then(() => branch.create(tag))
-    .then(() => makeChangelog())
-    .then((changes) => {
-      changelog = changes
-
-      return bumper.bumpVersion(tag, jsonPackage, `${projectPath}/package.json`)
-    })
+    .then(() => bumpVersion(packageInfo, tag))
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
     .then(issue => {
-      sha = issue.head.sha
+      sha = issue.head.sha;
 
-      return pr.updateLabels(issue.number)
+      return pr.updateLabels(issue.number);
     })
     .then(() => testEnv.getBuildNumber(envTestBranchName))
     .then(build => {
-      travisBuild = build.replace('\n', '')
+      travisBuild = build.replace('\n', '');
 
-      return testEnv.getTravisBuildId(envTestBranchName)
+      return testEnv.getTravisBuildId(envTestBranchName);
     })
     .then(id => {
-      buildId = id
+      buildId = id;
 
-      return pr.updateStatus(sha, 'pending', buildId)
+      return pr.updateStatus(sha, 'pending', buildId);
     })
     .then(() => testEnv.streamLog(travisBuild))
-    .then(res => pr.updateStatus(sha, res.status, buildId))
+    .then(res => pr.updateStatus(sha, res.status, buildId));
 }
 
-const run = () => {
-// Let's run everything
-  prerequisite.hasTestEnv()
-    .then(() => {
-      const
-        branch = new Branch(tag, projectPath),
-        testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken)
+function run (dryRun) {
+  const
+    branch = new Branch(tag, projectPath),
+    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken);
 
-      runTest(branch, testEnv)
-        .then(() => process.exit(0))
-        .catch(err => {
-          if (err) {
-            console.error(`\x1b[31m${err}\x1b[0m`)
-          }
-          if (!noCleanup) {
-            // Clean up
-            testEnv.deleteProposalBranch(envTestBranchName)
-            branch.delete(`${tag}`)
-          }
-        })
+  // Let's run everything
+  return prerequisite.hasTestEnv()
+    .then(() => branch.getCurrent())
+    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
+    .then(() => testEnv.reviewTravisYml())
+    .then(() => testEnv.writeMatrix())
+    .then(() => makeChangelog())
+    .then(changelog => {
+      if (dryRun) {
+        console.log('Dry run ended successfully.');
+        return Promise.resolve();
+      }
+
+      return release(branch, testEnv, changelog);
     })
-    .catch(() => {
-      console.error('You must clone kuzzle-release-tool into this repo. git submodule update --recursive')
-    })
+    .catch(err => {
+      if (!noCleanup) {
+        // Clean up
+        console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
+        testEnv.deleteProposalBranch(envTestBranchName);
+        branch.delete(tag);
+      }
+
+      return Promise.reject(err);
+    });
 }
 
-if (args.includes('--dry-run')) {
-  dryRun()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1))
-} else {
-  run()
+/**
+ * Detects the project information file, parse it and return
+ * relevant informations
+ * 
+ * @return {object} 
+ */
+function getProjectInfo () {
+  const files = [
+    {name: 'package.json', type: 'json'},
+    {name: 'composer.json', type: 'json'},
+    {name: 'build.gradle', type: 'gradle'}
+  ];
+
+  return new Promise((resolve, reject) => {
+    for (const file of files) {
+      const fullpath = `${projectPath}/${file.name}`;
+      
+      try {
+        fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
+      }
+      catch(e) {
+        // ignore exception and continue with next file check
+        continue;
+      }
+ 
+      let version, content;
+
+      if (file.type === 'json') {
+        content = require(fullpath);
+        version = content.version;
+      }
+      else {
+        // for now, there is only gradle projects left
+        // other cases might be added later
+        try {
+          content = fs.readFileSync(fullpath, 'utf8');
+        }
+        catch (error) {
+          return reject(new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`));
+        }
+
+        version = content
+          .split('\n')
+          .filter(line => line.match(/^version\s*=\s*\"/))
+          .map(line => line.replace(/^version\s*=\s*\"(.*?)\"/, '$1'))[0];
+      }
+
+      return resolve({
+        version,
+        content,
+        type: file.type,
+        name: file.name,
+        path: fullpath
+      });
+    }
+
+    reject(new Error(`No project file found in ${projectPath}`));
+  });
 }

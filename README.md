@@ -3,6 +3,7 @@ Sets of tools allowing to:
 * Detect projects needing to be release: [checkUpdate.js](#checkUpdatejs)
 * Auto-generate changelog and prepare release pull request: [release.js](#releasejs)
 * Creates a tag and its changelog on github: [publish.js](#publishjs)
+* Create snapshot on DigitalOcean: [digitalocean.js](#digitaloceanjs)
 
 # checkUpdate.js
 
@@ -110,4 +111,13 @@ This script creates a new tag from the changelog created locally by [release.js]
 
 ```
     $ node publish.js --tag <the tag to release> --gh-token <your github token> --project-path ~/Projects/kuzzle
+```
+
+It will create a tag on github with the last changelog as body.
+
+# digitalocean.js
+
+```
+$ node digitalocean.js --token <your person digitalocean token> --version <kuzzle version>
+
 ```

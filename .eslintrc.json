@@ -49,7 +49,7 @@
     "space-in-parens": [2, "never"],
     "vars-on-top": 2,
     "yoda": [2, "never"],
-    "semi": 0,
+    "semi": 2,
     "no-console": 0,
     "no-nested-ternary": 0
   },

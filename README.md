@@ -10,17 +10,16 @@ Tool to auto generate a changelog from 2 branches of any repository and auto rel
 
 Clone this repository in the repository you want to release.
 
-| Options    | Description
-|------------|----------------------------------------------------------------
-| --help     | Show help
-| --from     | The git tag you want to start the release from
-| --to       | The git tag you want to stop the release to
-| --tag      | Tag to release
-| --dry-run  | Generate changelog but do not release
-| --gh-token | Your github token
-| --output   | Changelog file (stdout will be used if this option is not set)
-| --no-cleanup   | Do not delete created branches if error
-| --project-path | Specify where is the project to release
+| Options    | Required? | Description                                        |
+|------------|----------------------------------------------------------------|
+| --from     | yes | The git tag / branch you want to start the release from
+| --to       | yes | The git tag / branch you want to stop the release to
+| --tag      | yes | Tag to release
+| --gh-token | yes | Your github token
+| --project-path | yes | Specify where is the project to release
+| --dry-run  | no | Generate changelog but do not release
+| --help     | no | Show help |
+| --no-cleanup   | no | Do not delete created branches if error
 
 ## Usage example
 
@@ -79,6 +78,19 @@ You must fill the compat.json to specify which version of kuzzle and proxy you w
 # Publish a release on github
 
 To publish a release on github run the publish.js script
+
+
+| Options    | Required? | Description                                        |
+|------------|----------------------------------------------------------------|
+| --tag | yes | Tag to release |
+| --gh-token | yes | Your github token |
+| --project-path | yes |  Path of the project to release |
+| --help     | no | Show help |
+| --draft | no | Draft the tag in github instead of releasing it |
+| --prerelease | no | Mark the tag as a prerelease version |
+
+
+**Example:**
 
 ```
     $ node publish.js --tag <the tag to release> --gh-token <your github token> --project-path ~/Projects/kuzzle

@@ -8,7 +8,7 @@ const
   request = require('request-promise')
 
 let
-  dropletId = '52227345'
+  dropletId = null
 
 const help = () => {
   console.log('usage:')
@@ -42,7 +42,7 @@ function createDroplet () {
 runcmd:
   - sudo echo "vm.max_map_count=262144" >> /etc/sysctl.conf
   - wget -O /root/docker-compose.yml http://kuzzle.io/docker-compose.yml
-  - sudo wget -O /root/kuzzle.service https://gist.githubusercontent.com/AnthonySendra/8a816ae7b7a79b20d470422f4dfa7c29/raw/31e2666f6c5a7d7bc69850ff8bd8563a5288dbe9/kuzzle.service
+  - sudo wget -O /root/kuzzle.service https://gist.githubusercontent.com/kuzzle/8820024b9727399dd126f6792167acd7/raw/3d0717640abc50995d5c277686eaa2f47b08cc03/kuzzle.service
   - sudo mv /root/kuzzle.service /lib/systemd/system/kuzzle.service
   - systemctl enable kuzzle
 `
@@ -77,6 +77,10 @@ runcmd:
 }
 
 function waitingInstall() {
+  // Waiting for "user data"
+  // When DigitalOcean create a new Droplet, we can specify a script to execute: "user_data"
+  // The problem is, DO says the droplet is ready before the "user_data" script is complete
+  // We arbitrary wait for 2min before considering it as ready
   return new Promise(resolve => {
     setTimeout(() => {
       resolve()

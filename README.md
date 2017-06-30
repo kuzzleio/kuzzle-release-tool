@@ -1,4 +1,14 @@
-Tool to auto generate a changelog from 2 branches of any repository and auto release it on github
+Sets of tools allowing to:
+
+* Detect projects needing to be release: [checkUpdate.js](#checkUpdatejs)
+* Auto-generate changelog and prepare release pull request: [release.js](#releasejs)
+* Creates a tag and its changelog on github: [publish.js](#publishjs)
+
+# checkUpdate.js
+
+This script scans all the projects of a provided user and detects if the master branch is behind one or multiple development branches.
+
+Development branches are branches whose names match the pattern set in the `devBranchPattern` property of the `config.json` file.
 
 ## Usage
 
@@ -6,14 +16,47 @@ Clone this repository in the repository you want to release.
 
 | Options    | Required? | Description                                        |
 |------------|----------------------------------------------------------------|
-| --from     | yes | The git tag / branch you want to start the release from
-| --to       | yes | The git tag / branch you want to stop the release to
-| --tag      | yes | Tag to release
-| --gh-token | yes | Your github token
-| --project-path | yes | Specify where is the project to release
-| --dry-run  | no | Generate changelog but do not release
+| --gh-token | yes | Your github token. Although no github operation require rights, this script needs to be authenticated because of [Github API rate limits](https://developer.github.com/v3/rate_limit/) |
+| --user | yes | The name of the github repository |
 | --help     | no | Show help |
-| --no-cleanup   | no | Do not delete created branches if error
+
+
+# release.js
+
+This script follows the following steps to make a release:
+
+- Check if you cloned the kuzzle-test-environment submodule
+- Ask you for a review of the branch to release and compat.json
+- Ask you for a review of the .travis.yml
+- Create a new branch on the kuzzle-test-environment (x.y.z-proposal)
+- Rewrite the .travis.yml according to the version configuration in compat.json
+- Push the test branch
+- Create proposal branch on the project to release
+- Write the CHANGELOG
+- Update version on package.json
+- Commit and push the branch
+- Create release request (PR)
+- Add "release" label on the release request
+- Add custom status of the kuzzle-test-environment travis job on the release request
+- Stream travis log of kuzzle-test-environment
+- Update custom status of the kuzzle-test-environment travis job on the release request
+
+You must fill the compat.json to specify which version of kuzzle and proxy you want to test
+
+## Usage
+
+Clone this repository in the repository you want to release.
+
+| Options    | Required? | Description                                        |
+|------------|----------------------------------------------------------------|
+| --from     | yes | The git tag / branch you want to start the release from |
+| --to       | yes | The git tag / branch you want to stop the release to |
+| --tag      | yes | Tag to release |
+| --gh-token | yes | Your github token |
+| --project-path | yes | Specify where is the project to release |
+| --dry-run  | no | Generate changelog but do not release |
+| --help     | no | Show help |
+| --no-cleanup   | no | Do not delete created branches if error |
 
 ## Usage example
 
@@ -47,32 +90,11 @@ Clone this repository in the repository you want to release.
 - [ [#215](https://github.com/kuzzleio/kuzzle-backoffice/pull/215) ] Fix exposed port for Kuzzle backend in dev env: only 7512 is now used   ([ballinette](https://github.com/ballinette))
 ---
 
-## Release process
+# publish.js
 
-This script follows the following steps to make a release:
+This script creates a new tag from the changelog created locally by [release.js](#releasejs)
 
-- Check if you cloned the kuzzle-test-environment submodule
-- Ask you for a review of the branch to release and compat.json
-- Ask you for a review of the .travis.yml
-- Create a new branch on the kuzzle-test-environment (x.y.z-proposal)
-- Rewrite the .travis.yml according to the version configuration in compat.json
-- Push the test branch
-- Create proposal branch on the project to release
-- Write the CHANGELOG
-- Update version on package.json
-- Commit and push the branch
-- Create release request (PR)
-- Add "release" label on the release request
-- Add custom status of the kuzzle-test-environment travis job on the release request
-- Stream travis log of kuzzle-test-environment
-- Update custom status of the kuzzle-test-environment travis job on the release request
-
-You must fill the compat.json to specify which version of kuzzle and proxy you want to test
-
-## Publish a release on github
-
-To publish a release on github run the publish.js script
-
+## Usage
 
 | Options    | Required? | Description                                        |
 |------------|----------------------------------------------------------------|
@@ -89,5 +111,3 @@ To publish a release on github run the publish.js script
 ```
     $ node publish.js --tag <the tag to release> --gh-token <your github token> --project-path ~/Projects/kuzzle
 ```
-
-It will create a tag on github with the last changelog as body.

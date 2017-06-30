@@ -1,3 +1,9 @@
+* [Create the release PR](#create-the-release-pr)
+* [Publish a release on github](#publish-a-release-on-github)
+* [Create snapshot on DigitalOcean](#create-snapshot-on-digitalocean)
+
+# Create the release PR
+
 Tool to auto generate a changelog from 2 branches of any repository and auto release it on github
 
 ## Usage
@@ -69,7 +75,7 @@ This script follows the following steps to make a release:
 
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
 
-## Publish a release on github
+# Publish a release on github
 
 To publish a release on github run the publish.js script
 
@@ -91,3 +97,10 @@ To publish a release on github run the publish.js script
 ```
 
 It will create a tag on github with the last changelog as body.
+
+# Create snapshot on DigitalOcean
+
+```
+$ node digitalocean.js --token <your person digitalocean token> --version <kuzzle version>
+
+```

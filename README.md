@@ -13,8 +13,6 @@ Development branches are branches whose names match the pattern set in the `devB
 
 ## Usage
 
-Clone this repository in the repository you want to release.
-
 | Options    | Required? | Description                                        |
 |------------|----------------------------------------------------------------|
 | --gh-token | yes | Your github token. Although no github operation require rights, this script needs to be authenticated because of [Github API rate limits](https://developer.github.com/v3/rate_limit/) |
@@ -45,8 +43,6 @@ This script follows the following steps to make a release:
 You must fill the compat.json to specify which version of kuzzle and proxy you want to test
 
 ## Usage
-
-Clone this repository in the repository you want to release.
 
 | Options    | Required? | Description                                        |
 |------------|----------------------------------------------------------------|

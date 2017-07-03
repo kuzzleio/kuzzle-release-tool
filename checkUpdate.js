@@ -22,7 +22,7 @@ if (!user || !token) {
   process.exit(1);
 }
 
-apiRequest(`users/${user}/repos`)
+apiRequest(`orgs/${user}/repos`)
   .then(repos => {
     const promises = [];
 

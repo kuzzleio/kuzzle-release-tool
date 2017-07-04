@@ -114,7 +114,7 @@ You can create your DigitalOcean `api_token` [here](https://cloud.digitalocean.c
 You can create your AWS `access_key` and `secret_key` [here](https://console.aws.amazon.com/iam/home?region=us-west-1#/users).
 
 Currently, the script will deploy to:
-* AWS London (eu-west-1) on Ubuntu 16.04 (ami-06d0f775)
+* AWS Ireland (eu-west-1) on Ubuntu 16.04 (ami-06d0f775)
 * AWS N. California (us-west-1) on Ubuntu 16.04 (ami-1b1e4b7b)
 * DigitalOcean Amsterdam (ams2) on Ubuntu 16.04 (25615166)
 * DigitalOcean New-York (nyc1) on Ubuntu 16.04 (25615166)

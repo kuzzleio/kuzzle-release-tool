@@ -26,11 +26,12 @@ const
 
 if (args.includes('--help')) {
   help();
-  process.exit(1);
+  process.exit(0);
 }
 
 if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
   help();
+  console.error('\x1b[31mRequired argument missing\x1b[0m');
   process.exit(1);
 }
 

@@ -14,7 +14,7 @@ const
 
 if (args.includes('--help')) {
   help();
-  process.exit(1);
+  process.exit(0);
 }
 
 if (!projectPath || !tag || !ghToken) {

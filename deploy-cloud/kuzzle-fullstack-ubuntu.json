@@ -1,0 +1,64 @@
+{
+  "provisioners": [
+    {
+      "type": "shell",
+      "execute_command": "echo 'packer' | sudo -S sh -c '{{ .Vars }} {{ .Path }}'",
+      "inline": [
+        "curl -L https://github.com/docker/compose/releases/download/1.14.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose",
+        "chmod +x /usr/local/bin/docker-compose",
+        "echo 'vm.max_map_count=262144' >> /etc/sysctl.conf",
+        "wget -O /root/docker-compose.yml http://kuzzle.io/docker-compose.yml",
+        "wget -O /root/kuzzle.service https://gist.githubusercontent.com/kuzzle/8820024b9727399dd126f6792167acd7/raw/3d0717640abc50995d5c277686eaa2f47b08cc03/kuzzle.service",
+        "mv /root/kuzzle.service /lib/systemd/system/kuzzle.service",
+        "systemctl enable kuzzle"
+      ]
+    }
+  ],
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "name": "amazon-ebs-us-west-1",
+      "access_key": "{{user `access_key`}}",
+      "secret_key": "{{user `secret_key`}}",
+      "ami_name": "kuzzle-{{user `version`}}-dev-hvm-ubuntu-16.04",
+      "ami_description": "Official Kuzzle full stack on Ubuntu 16.04. For development purpose only.",
+      "ami_groups": ["all"],
+      "ssh_username": "ubuntu",
+      "source_ami": "ami-1b1e4b7b",
+      "instance_type": "t2.medium",
+      "region": "us-west-1"
+    },
+    {
+      "type": "amazon-ebs",
+      "name": "amazon-ebs-eu-west-1",
+      "access_key": "{{user `access_key`}}",
+      "secret_key": "{{user `secret_key`}}",
+      "ami_name": "kuzzle-{{user `version`}}-dev-hvm-2017.03.d-amazon-ecs-optimized",
+      "ami_description": "Official Kuzzle full stack on Amazon Linux AMI 2017.03.d x86_64 ECS. For development purpose only.",
+      "ssh_username": "ec2-user",
+      "source_ami": "ami-809f84e6",
+      "instance_type": "t2.medium",
+      "region": "eu-west-1"
+    },
+    {
+      "type": "digitalocean",
+      "name": "digitalocean-ams2",
+      "api_token": "{{user `api_token`}}",
+      "ssh_username": "root",
+      "snapshot_name": "kuzzle-{{user `version`}}-ams-ubuntu-16.04-x64",
+      "region": "ams2",
+      "size": "4gb",
+      "image": "25615166"
+    },
+    {
+      "type": "digitalocean",
+      "name": "digitalocean-nyc1",
+      "api_token": "{{user `api_token`}}",
+      "ssh_username": "root",
+      "snapshot_name": "kuzzle-{{user `version`}}-nyc-ubuntu-16.04-x64",
+      "region": "nyc1",
+      "size": "4gb",
+      "image": "25615166"
+    }
+  ]
+}

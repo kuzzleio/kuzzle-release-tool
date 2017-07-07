@@ -3,7 +3,7 @@ Sets of tools allowing to:
 * Detect projects needing to be release: [checkUpdate.js](#checkUpdatejs)
 * Auto-generate changelog and prepare release pull request: [release.js](#releasejs)
 * Creates a tag and its changelog on github: [publish.js](#publishjs)
-* Create snapshot on DigitalOcean: [digitalocean.js](#digitaloceanjs)
+* Deploying snapshot to the cloud: [via Docker](#deploying-to-the-cloud)
 
 # checkUpdate.js
 
@@ -111,9 +111,23 @@ This script creates a new tag from the changelog created locally by [release.js]
 
 It will create a tag on github with the last changelog as body.
 
-# digitalocean.js
+# Deploying to the cloud
 
 ```
-$ node digitalocean.js --token <your person digitalocean token> --version <kuzzle version>
-
+$ docker run -i -t -v $(pwd)/deploy-kuzzle-fullstack-cloud.json:/opt/deploy-kuzzle-fullstack-cloud.json \
+                    hashicorp/packer:1.0.2 build \
+                    -var 'api_token=<your digital ocean API token>' \
+                    -var 'access_key=<your AWS access_key>' \
+                    -var 'secret_key=<your AWS secret key>' \
+                    -var 'version=1.0.0' \
+                    /opt/deploy-kuzzle-fullstack-cloud.json
 ```
+
+You can create your DigitalOcean `api_token` [here](https://cloud.digitalocean.com/settings/api/tokens?i=824828).  
+You can create your AWS `access_key` and `secret_key` [here](https://console.aws.amazon.com/iam/home?region=us-west-1#/users).
+
+Currently, the script will create snapshot in:
+* AWS Ireland (eu-west-1) on Ubuntu 16.04 (ami-06d0f775)
+* AWS N. California (us-west-1) on Ubuntu 16.04 (ami-1b1e4b7b)
+* DigitalOcean Amsterdam (ams2) on Ubuntu 16.04 (25615166)
+* DigitalOcean New-York (nyc1) on Ubuntu 16.04 (25615166)

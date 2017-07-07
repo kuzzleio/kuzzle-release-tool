@@ -3,7 +3,7 @@ Sets of tools allowing to:
 * Detect projects needing to be release: [checkUpdate.js](#checkUpdatejs)
 * Auto-generate changelog and prepare release pull request: [release.js](#releasejs)
 * Creates a tag and its changelog on github: [publish.js](#publishjs)
-* Deploying spnapshot to the cloud: [via Docker](#deploying-to-the-cloud)
+* Deploying snapshot to the cloud: [via Docker](#deploying-to-the-cloud)
 
 # checkUpdate.js
 

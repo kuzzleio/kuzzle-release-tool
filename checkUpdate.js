@@ -132,10 +132,7 @@ function detectChanges(repo) {
             process.stdout.write(`===> ${repo} can be released from: `);
           }
 
-          process.stdout.write(devBranches[i]);
-          if (count > 0) {
-            process.stdout.write(', ');
-          }
+          process.stdout.write(devBranches[i] + ' ');
 
           count++;
         }

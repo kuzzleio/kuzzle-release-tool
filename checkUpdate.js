@@ -48,7 +48,7 @@ function help() {
 
 function apiRequest (url, querystring = {}) {
   const 
-    qs = Object.assign({access_token: token}, querystring),
+    qs = Object.assign({access_token: token, per_page: 999}, querystring),
     uri = `http://${config.github.api}/${url}`,
     options = {
       qs,

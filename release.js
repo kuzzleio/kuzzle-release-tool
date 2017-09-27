@@ -89,21 +89,31 @@ function makeChangelog () {
   }
 
   return new Promise((resolve, reject) => {
-    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
+    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag}`, (error, stdout) => {
       if (error) {
         return reject(error);
       }
 
       const 
-        promises = [],
         generator = new Generator(owner, repo, tag, ghToken),
         reader = new Reader(owner, repo, ghToken);
 
-      for (const id of stdout.split('\n')) {
-        if (id) {
-          promises.push(reader.readFromGithub(id));
-        }
-      }
+      const promises = stdout
+        .split('\n')
+        .map(pr => {
+          // Merge commits
+          if (pr.indexOf('Merge pull request') !== -1) {
+            return reader.readFromGithub(pr.replace(/.*#([0-9]+).*/, '$1'));
+          }
+
+          // Fast-forwards
+          if (pr.indexOf('(#') !== -1) {
+            return reader.readFromGithub(pr.replace(/.*\(#([0-9]+).*/, '$1'));
+          }
+
+          return null;
+        })
+        .filter(line => line);
 
       Promise.all(promises)
         .then(result => generator.generate(packageInfo.version, result))

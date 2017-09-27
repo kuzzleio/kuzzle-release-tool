@@ -11,7 +11,8 @@ const
   ask = require('./lib/ask'),
   crypto = require('crypto'),
   fs = require('fs'),
-  getRepoInfo = require('./lib/get-repo-info');
+  getRepoInfo = require('./lib/get-repo-info'),
+  config = require('./config.json');
 
 // arguments parsing
 const
@@ -75,6 +76,17 @@ function help () {
 }
 
 function makeChangelog () {
+  if (!config.changelogDir) {
+    throw new Error('No changelog directory configured. Please set a "changelogDir" property in the JSON configuration file');
+  }
+
+  try {
+    fs.mkdirSync(config.changelogDir);
+  }
+  catch (e) {
+    // directory already exists: do nothing
+  }
+
   return new Promise((resolve, reject) => {
     exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit ${toTag}..${fromTag} | grep "pull request" | awk '{gsub(/#/, ""); print $4}'`, (error, stdout) => {
       if (error) {
@@ -86,16 +98,16 @@ function makeChangelog () {
         generator = new Generator(owner, repo, tag, ghToken),
         reader = new Reader(owner, repo, ghToken);
 
-      stdout.split('\n').forEach(id => {
+      for (const id of stdout.split('\n')) {
         if (id) {
           promises.push(reader.readFromGithub(id));
         }
-      });
+      }
 
       Promise.all(promises)
         .then(result => generator.generate(packageInfo.version, result))
         .then(changeLog => {
-          const changelogFile = `${owner}.${repo}.CHANGELOG.md`;
+          const changelogFile = `${config.changelogDir}/${owner}.${repo}.CHANGELOG.md`;
 
           fs.writeFile(changelogFile, changeLog, 'utf8', err => {
             if (err) {

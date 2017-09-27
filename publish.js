@@ -1,7 +1,8 @@
 const
   fs = require('fs'),
   getRepoInfo = require('./lib/get-repo-info'),
-  Publisher = require('./lib/publisher/publisher');
+  Publisher = require('./lib/publisher/publisher'),
+  config = require('./config.json');
 
 // arguments parsing
 const
@@ -27,7 +28,7 @@ getRepoInfo(projectPath)
   .then(info => {
     const 
       {owner, repo} = info,
-      changelogFile = `${owner}.${repo}.CHANGELOG.md`;
+      changelogFile = `${config.changelogDir}/${owner}.${repo}.CHANGELOG.md`;
 
     try {
       fs.accessSync(changelogFile, fs.constants.R_OK);

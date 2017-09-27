@@ -21,5 +21,6 @@
     "totalRetry": "500",
     "retryInterval": "500"
   },
-  "devBranchPattern": "*.x"
+  "devBranchPattern": "*.x",
+  "changelogDir": "changelogs"
 }

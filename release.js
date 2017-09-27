@@ -50,8 +50,9 @@ getProjectInfo()
   })
   .then(() => process.exit(0))
   .catch(error => {
-    const message = error instanceof Error ? error.message : error;
+    const message = error instanceof Error ? error.stack : error;
     console.error(`\x1b[31m${message}\x1b[0m`);
+
     process.exit(1);
   });
 

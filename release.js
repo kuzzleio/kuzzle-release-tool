@@ -3,13 +3,9 @@ const
   Reader = require('./lib/changelog-gen/reader'),
   Generator = require('./lib/changelog-gen/generator'),
   Branch = require('./lib/release-mgr/branch'),
-  prerequisite = require('./lib/prerequisite'),
-  TestEnvironment = require('./lib/release-mgr/test-env'),
   bumpVersion = require('./lib/release-mgr/bumper'),
   PullRequest = require('./lib/release-mgr/pull-request'),
-  compat = require('./compat.json'),
   ask = require('./lib/ask'),
-  crypto = require('crypto'),
   fs = require('fs'),
   getRepoInfo = require('./lib/get-repo-info'),
   config = require('./config.json');
@@ -17,7 +13,6 @@ const
 // arguments parsing
 const
   args = process.argv.slice(2),
-  envTestBranchName = crypto.createHmac('sha256', Math.random().toString()).digest('hex'),
   ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
   toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
   fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
@@ -50,10 +45,15 @@ getProjectInfo()
   })
   .then(() => process.exit(0))
   .catch(error => {
-    const message = error instanceof Error ? error.stack : error;
-    console.error(`\x1b[31m${message}\x1b[0m`);
+    if (error) {
+      const message = error instanceof Error ? error.stack : error;
+      console.error(`\x1b[31m${message}\x1b[0m`);
+    }
+    else {
+      console.log('Goodbye.');
+    }
 
-    process.exit(1);
+    process.exit(Number(error !== undefined));
   });
 
 /*
@@ -136,52 +136,25 @@ function makeChangelog () {
   });
 }
 
-function release (branch, testEnv, changelog) {
-  let 
-    sha,
-    travisBuild,
-    buildId;
-
+function release (branch, changelog) {
   const
     pr = new PullRequest(owner, repo, tag, ghToken);
 
   return branch.create(tag)
-    .then(() => testEnv.createProposalBranch(envTestBranchName))
-    .then(() => testEnv.pushProposalBranch(envTestBranchName))
     .then(() => bumpVersion(packageInfo, tag))
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
-    .then(issue => {
-      sha = issue.head.sha;
-
-      return pr.updateLabels(issue.number);
-    })
-    .then(() => testEnv.getBuildNumber(envTestBranchName))
-    .then(build => {
-      travisBuild = build.replace('\n', '');
-
-      return testEnv.getTravisBuildId(envTestBranchName);
-    })
-    .then(id => {
-      buildId = id;
-
-      return pr.updateStatus(sha, 'pending', buildId);
-    })
-    .then(() => testEnv.streamLog(travisBuild))
-    .then(res => pr.updateStatus(sha, res.status, buildId));
+    .then(issue => pr.updateLabels(issue.number));
 }
 
 function run (dryRun) {
   const
-    branch = new Branch(tag, projectPath),
-    testEnv = new TestEnvironment(owner, repo, envTestBranchName, ghToken);
+    branch = new Branch(tag, projectPath);
 
   // Let's run everything
-  return prerequisite.hasTestEnv()
+  return branch.checkout(fromTag)
     .then(() => branch.getCurrent())
-    .then(currentBranch => ask(`You are about to make a release based on branch ${currentBranch}with compat.json: \x1b[33m${JSON.stringify(compat, null, 2)}\x1b[0m\nAre you sure you want to release? (Y|n) `))
-    .then(() => testEnv.reviewTravisYml())
-    .then(() => testEnv.writeMatrix())
+    .then(currentBranch => ask(`\x1b[33mYou are about to make a release based on branch ${currentBranch}\x1b[0m\nAre you sure you want to release? (Y|n) `))
     .then(() => makeChangelog())
     .then(changelog => {
       if (dryRun) {
@@ -189,13 +162,12 @@ function run (dryRun) {
         return Promise.resolve();
       }
 
-      return release(branch, testEnv, changelog);
+      return release(branch, changelog);
     })
     .catch(err => {
-      if (!noCleanup) {
+      if (!noCleanup && err !== undefined) {
         // Clean up
         console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
-        testEnv.deleteProposalBranch(envTestBranchName);
         branch.delete(tag);
       }
 

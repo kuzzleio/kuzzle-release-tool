@@ -141,7 +141,7 @@ function release (branch, changelog) {
     pr = new PullRequest(owner, repo, tag, ghToken);
 
   return branch.create(tag)
-    .then(() => bumpVersion(packageInfo, tag))
+    .then(() => bumpVersion(projectPath, packageInfo, tag))
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
     .then(issue => pr.updateLabels(issue.number));

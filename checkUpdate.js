@@ -1,54 +1,51 @@
 const
+  yargs = require('yargs'),
   rp = require('request-promise'),
-  minimatch = require('minimatch'),
-  config = require('./config.json');
+  Bluebird = require('bluebird'),
+  config = require('./config.json'),
+  repositories = require('./repositories');
+
+const maxRepoName = Object.keys(repositories).reduce((max, name) => Math.max(name.length, max), '');
 
 // arguments parsing
-const
-  args = process.argv.slice(2),
-  user = args.includes('--user') ? args[args.indexOf('--user') + 1] : null,
-  // Authentication token is required for better Github API rate limits
-  // Rate limits on unauthenticated requests are too low for this tool
-  token = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null;
+const args = yargs
+  .usage('USAGE: $0 --token <token>')
+  .option('token', {
+    alias: 't',
+    demandOption: true,
+    type: 'string',
+    describe: 'Github auth token'
+  })
+  .strict(true)
+  .parse();
 
-if (args.includes('--help')) {
-  help();
-  process.exit(0);
-}
+Bluebird.map(
+  Object.keys(repositories),
+  repo => detectChanges(repo),
+  {concurrency: config.github.concurrency}
+)
+  .then(_results => {
+    const results = _results.filter(r => r !== null);
 
-if (!user || !token) {
-  help();
-  console.error('\x1b[31mRequired argument missing\x1b[0m');
-  process.exit(1);
-}
+    if (results.length > 0) {
+      console.log('\x1b[32mThe following repositories can be released:\x1b[0m');
 
-apiRequest(`orgs/${user}/repos`)
-  .then(repos => {
-    const promises = [];
-
-    for (const repo of repos) {
-      promises.push(detectChanges(repo.name));
+      for (const result of results) {
+        console.log(`\x1b[32m\t${result.name.padEnd(maxRepoName)} => Versions: ${result.versions.join(',')}\x1b[0m`);
+      }
+    } else {
+      console.log('\x1b[32mNothing to release.\x1b[0m');
     }
-
-    return Promise.all(promises);
   })
   .catch(error => {
     console.error(`\x1b[31m${error.message}\x1b[0m`);
+    console.error(`\x1b[31m${error.stack}\x1b[0m`);
     process.exit(1);
   });
 
-
-function help() {
-  console.log('usage:');
-  console.log('       --gh-token     Github auth token');
-  console.log('       --user         The name of the github user owner to scan');
-  console.log('\noptional:');
-  console.log('       --help         Show this help');
-}
-
 function apiRequest (url, querystring = {}) {
-  const 
-    qs = Object.assign({access_token: token, per_page: 999}, querystring),
+  const
+    qs = Object.assign({access_token: args.token, per_page: 999}, querystring),
     uri = `http://${config.github.api}/${url}`,
     options = {
       qs,
@@ -67,20 +64,20 @@ function apiRequest (url, querystring = {}) {
 }
 
 function getBranches(repo) {
-  return apiRequest(`repos/${user}/${repo}/branches`)
+  return apiRequest(`repos/kuzzleio/${repo}/branches`)
     .then(response => {
       const branches = {};
 
       for (const branch of response) {
         branches[branch.name] = branch.commit.sha;
       }
-      
+
       return branches;
     });
 }
 
 function getLastUpdate (repo, sha) {
-  return apiRequest(`repos/${user}/${repo}/commits`, {sha})
+  return apiRequest(`repos/kuzzleio/${repo}/commits`, {sha})
     .then(response => {
       let lastUpdate = 0;
 
@@ -93,14 +90,22 @@ function getLastUpdate (repo, sha) {
 
         return lastUpdate;
       }
+    })
+    .catch(err => {
+      if (err.statusCode === 409 && err.message.match('is empty') !== null) {
+        return 0;
+      }
+      throw err;
     });
 }
 
 function detectChanges(repo) {
-  let 
+  let
     branches,
-    devBranches,
     devBranchDates;
+  const
+    devBranches = repositories[repo].map(branch => branch.development),
+    releaseBranches = repositories[repo].map(branch => branch.release);
 
   console.log(`Scanning project ${repo}...`);
 
@@ -108,42 +113,47 @@ function detectChanges(repo) {
     .then(response => {
       branches = response;
 
-      devBranches = Object.keys(branches)
-        .filter(name => minimatch(name, config.devBranchPattern));
+      let missing = devBranches.filter(branch => !branches[branch]);
 
-      const promises = [];
-
-      for (const devbranch of devBranches) {
-        promises.push(getLastUpdate(repo, branches[devbranch]));
+      if (missing.length > 0) {
+        console.error(`\x1b[31m/!\\ [${repo}] Unknown development branches: ${missing.join(',')}\x1b[0m`);
+        process.exit(1);
       }
 
-      return Promise.all(promises);
+      missing = repositories[repo]
+        .map(branch => branch.release)
+        .filter(branch => !branches[branch]);
+
+      if (missing.length > 0) {
+        console.error(`\x1b[31m/!\\ [${repo}] Unknown release branches: ${missing.join(',')}\x1b[0m`);
+        process.exit(1);
+      }
+
+      return Bluebird.map(
+        devBranches,
+        devBranch => getLastUpdate(repo, branches[devBranch]),
+        {concurrency: config.github.concurrency});
     })
     .then(dates => {
       devBranchDates = dates;
-      return getLastUpdate(repo, branches.master);
+      return Bluebird.map(
+        releaseBranches,
+        releaseBranch => getLastUpdate(repo, branches[releaseBranch]),
+        {concurrency: config.github.concurrency});
     })
-    .then(masterDate => {
-      let count = 0;
+    .then(releaseDates => {
+      const toBeReleased = [];
 
-      for(let i = 0; i < devBranches.length; i++) {
-        if (masterDate < devBranchDates[i]) {
-          if (count === 0) {
-            process.stdout.write(`===> ${repo} can be released from: `);
-          }
-
-          process.stdout.write(devBranches[i] + ' ');
-
-          count++;
+      for(let i = 0; i < repositories[repo].length; i++) {
+        if (releaseDates[i] < devBranchDates[i]) {
+          toBeReleased.push(repositories[repo][i].version);
         }
       }
 
-      if (count > 0) {
-        process.stdout.write('\n');
+      if (toBeReleased.length > 0) {
+        return {name: repo, versions: toBeReleased};
       }
 
-      if (count > 1) {
-        console.error('\x1b[31m/!\\ master is behind multiple development branches\x1b[0m');
-      }
+      return null;
     });
 }

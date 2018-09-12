@@ -1,4 +1,6 @@
-const 
+const
+  yargs = require('yargs'),
+  semver = require('semver'),
   exec = require('child_process').exec,
   Reader = require('./lib/changelog-gen/reader'),
   Generator = require('./lib/changelog-gen/generator'),
@@ -8,40 +10,74 @@ const
   ask = require('./lib/ask'),
   fs = require('fs'),
   getRepoInfo = require('./lib/get-repo-info'),
-  config = require('./config.json');
+  config = require('./config'),
+  repositories = require('./repositories');
+
+const disclaimer = '[comment]: # (THIS FILE IS PURELY INFORMATIONAL, IT IS NOT USED IN THE RELEASE PROCESS)\n\n';
 
 // arguments parsing
-const
-  args = process.argv.slice(2),
-  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
-  toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
-  fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
-  tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-  noCleanup = args.includes('--no-cleanup'),
-  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
+const args = yargs
+  .options({
+    major: {
+      alias: 'm',
+      describe: 'Repository version to release (see repositories.json)',
+      demandOption: true,
+      type: 'number',
+      group: 'Required'
+    },
+    token: {
+      alias: 't',
+      describe: 'Github token',
+      demandOption: true,
+      type: 'string',
+      group: 'Required'
+    },
+    'no-cleanup': {
+      alias: 'n',
+      describe: 'Do not delete local and remote branches if the script fails',
+      type: 'boolean',
+      group: 'Optional'
+    },
+    'dry-run': {
+      alias: 'd',
+      describe: 'Generates the changelog, but does not push anything to github',
+      type: 'boolean',
+      group: 'Optional'
+    }
+  })
+  .strict(true)
+  .usage('USAGE: $0 -m <major> -t <token> <project directory>')
+  .parse();
 
-if (args.includes('--help')) {
-  help();
-  process.exit(0);
-}
-
-if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
-  help();
-  console.error('\x1b[31mRequired argument missing\x1b[0m');
+if (args._.length !== 1) {
+  yargs.showHelp();
+  console.error('A repository directory must be provided');
   process.exit(1);
 }
 
-let owner, repo, packageInfo;
+const dir = args._[0];
+
+let owner, repo, packageInfo, versionInfo;
 
 getProjectInfo()
   .then(info => {
     packageInfo = info;
-    return getRepoInfo(projectPath);
+    return getRepoInfo(dir);
   })
   .then(info => {
     ({owner, repo} = info);
 
-    return run(args.includes('--dry-run'));
+    if (!repositories[repo]) {
+      throw new Error(`Unknown repository ${repo}. Please update the repositories.json file.`);
+    }
+
+    versionInfo = repositories[repo].find(v => v.version === args.major);
+
+    if (versionInfo === undefined) {
+      throw new Error(`Unknown major version "${args.major}"" for repository ${repo}. Verify the repositories.json file.`);
+    }
+
+    return run(args.dryRun);
   })
   .then(() => process.exit(0))
   .catch(error => {
@@ -58,22 +94,51 @@ getProjectInfo()
 
 /*
  * End of main file code
- * 
+ *
  * Beyond this point, there should be
  * only functions declaration
  */
 
-function help () {
-  console.log('usage:');
-  console.log('       --from         The git tag/branch you want to start the release from');
-  console.log('       --to           The git tag/branch you want to stop the release to');
-  console.log('       --tag          Tag to release');
-  console.log('       --gh-token     Your github token');
-  console.log('       --project-path Path of the project to release');
-  console.log('\noptional:');
-  console.log('       --help         Show this help');
-  console.log('       --dry-run      Generate changelog and run tests but do not release');
-  console.log('       --no-cleanup   Do not delete local and remote branches if the script fails');
+async function generateNewTag(prs) {
+  let releaseType = 'patch';
+  const breaking = [];
+
+  for (const pr of prs) {
+    for (const label of pr.labels) {
+      if (label === 'changelog:breaking-changes') {
+        breaking.push(pr);
+      } else if (label === 'changelog:new-features') {
+        releaseType = 'minor';
+      }
+    }
+  }
+
+  if (breaking.length > 0) {
+    releaseType = 'major';
+    console.log('\x1b[31m/!\\ This release contains breaking changes:\x1b[0m');
+
+    breaking.forEach(pr => console.log(`  #${pr.id}: ${pr.title}`));
+
+    console.log(`\x1b[31m
+New major versions require manual actions, such as the creation of a new
+target branch (usually named "<new major>-stable"), and adding that new
+version to the "repositories.json" file at the root of this project.
+
+Then a release can be performed using this tool, using the argument:
+  -v <newly created version>
+\x1b[0m`);
+    const answer = await ask('Have these steps been performed (Y|n)? ');
+
+    if (!answer) {
+      console.log('\x1b[31mAbort.\x1b[0m');
+      process.exit(1);
+    }
+  }
+
+  const tag = semver.inc(packageInfo.version, releaseType);
+
+  console.log(`\x1b[32mNew repository tag: ${tag}\x1b[0m`);
+  return tag;
 }
 
 function makeChangelog () {
@@ -89,14 +154,14 @@ function makeChangelog () {
   }
 
   return new Promise((resolve, reject) => {
-    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag}`, (error, stdout) => {
+    exec(`cd ${dir} && git fetch ; git log --abbrev-commit origin/${versionInfo.release}..origin/${versionInfo.development}`, (error, stdout) => {
       if (error) {
         return reject(error);
       }
 
-      const 
-        generator = new Generator(owner, repo, tag, ghToken),
-        reader = new Reader(owner, repo, ghToken);
+      const
+        generator = new Generator(owner, repo, packageInfo.version, args.token),
+        reader = new Reader(owner, repo, args.token);
 
       const promises = stdout
         .split('\n')
@@ -115,18 +180,27 @@ function makeChangelog () {
         })
         .filter(line => line);
 
-      Promise.all(promises)
-        .then(result => generator.generate(packageInfo.version, result))
-        .then(changeLog => {
-          const changelogFile = `${config.changelogDir}/${owner}.${repo}.CHANGELOG.md`;
+      let tag, prs;
 
-          fs.writeFile(changelogFile, changeLog, 'utf8', err => {
+      Promise.all(promises)
+        .then(_prs => {
+          prs = _prs;
+          return generateNewTag(prs, tag);
+        })
+        .then(_tag => {
+          tag = _tag;
+          return generator.generate(prs, tag);
+        })
+        .then(changelog => {
+          const changelogFile = `${config.changelogDir}/${owner}.${repo}.${args.major}.CHANGELOG.md`;
+
+          fs.writeFile(changelogFile, disclaimer + changelog, 'utf8', err => {
             if (err) {
               return reject(err);
             }
 
             console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
-            resolve(changeLog);
+            resolve({tag, changelog});
           });
 
           return null;
@@ -136,12 +210,12 @@ function makeChangelog () {
   });
 }
 
-function release (branch, changelog) {
+function release (branch, changelog, tag) {
   const
-    pr = new PullRequest(owner, repo, tag, ghToken);
+    pr = new PullRequest(owner, repo, tag, args.token, versionInfo.release);
 
   return branch.create(tag)
-    .then(() => bumpVersion(projectPath, packageInfo, tag))
+    .then(() => bumpVersion(dir, packageInfo, tag))
     .then(() => branch.push(tag))
     .then(() => pr.create(changelog))
     .then(issue => pr.updateLabels(issue.number));
@@ -149,26 +223,24 @@ function release (branch, changelog) {
 
 function run (dryRun) {
   const
-    branch = new Branch(tag, projectPath);
+    branch = new Branch(dir);
 
   // Let's run everything
-  return branch.checkout(fromTag)
-    .then(() => branch.getCurrent())
-    .then(currentBranch => ask(`\x1b[33mYou are about to make a release based on branch ${currentBranch}\x1b[0m\nAre you sure you want to release? (Y|n) `))
+  return branch.checkout(versionInfo.development)
     .then(() => makeChangelog())
-    .then(changelog => {
+    .then(result => {
       if (dryRun) {
         console.log('Dry run ended successfully.');
         return Promise.resolve();
       }
 
-      return release(branch, changelog);
+      return release(branch, result.changelog, result.tag);
     })
     .catch(err => {
-      if (!noCleanup && err !== undefined) {
+      if (!args.noCleanup && err !== undefined) {
         // Clean up
         console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
-        branch.delete(tag);
+        branch.delete('foo');
       }
 
       return Promise.reject(err);
@@ -178,8 +250,8 @@ function run (dryRun) {
 /**
  * Detects the project information file, parse it and return
  * relevant informations
- * 
- * @return {object} 
+ *
+ * @return {object}
  */
 function getProjectInfo () {
   const files = [
@@ -190,8 +262,8 @@ function getProjectInfo () {
 
   return new Promise((resolve, reject) => {
     for (const file of files) {
-      const fullpath = `${projectPath}/${file.name}`;
-      
+      const fullpath = `${dir}/${file.name}`;
+
       try {
         fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
       }
@@ -199,7 +271,7 @@ function getProjectInfo () {
         // ignore exception and continue with next file check
         continue;
       }
- 
+
       let version, content;
 
       if (file.type === 'json') {
@@ -218,8 +290,8 @@ function getProjectInfo () {
 
         version = content
           .split('\n')
-          .filter(line => line.match(/^version\s*=\s*\"/))
-          .map(line => line.replace(/^version\s*=\s*\"(.*?)\"/, '$1'))[0];
+          .filter(line => line.match(/^version\s*=\s*"/))
+          .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
       }
 
       return resolve({
@@ -231,6 +303,6 @@ function getProjectInfo () {
       });
     }
 
-    reject(new Error(`No project file found in ${projectPath}`));
+    reject(new Error(`No project file found in ${dir}`));
   });
 }

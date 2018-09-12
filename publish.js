@@ -1,73 +1,93 @@
 const
-  fs = require('fs'),
+  yargs = require('yargs'),
+  rp = require('request-promise'),
+  ask = require('./lib/ask'),
   getRepoInfo = require('./lib/get-repo-info'),
   Publisher = require('./lib/publisher/publisher'),
-  config = require('./config.json');
+  repositories = require('./repositories'),
+  config = require('./config');
 
 // arguments parsing
-const
-  args = process.argv.slice(2),
-  tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-  draft = args.includes('--draft'),
-  prerelease = args.includes('--prerelease'),
-  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
-  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
+const args = yargs
+  .usage('USAGE: $0 -t <token> -m <major> <project directory>')
+  .options({
+    major: {
+      alias: 'm',
+      demandOption: true,
+      type: 'number',
+      describe: 'The project\'s major version to be published'
+    },
+    token: {
+      alias: 't',
+      demandOption: true,
+      type: 'string',
+      describe: 'Github auth token'
+    },
+    draft: {
+      type: 'boolean',
+      describe: 'Draft the new release in Github, without publishing it'
+    },
+    prerelease: {
+      type: 'boolean',
+      describe: 'Flag the new tag as a prerelease'
+    }
+  })
+  .strict(true)
+  .parse();
 
-if (args.includes('--help')) {
-  help();
-  process.exit(0);
-}
-
-if (!projectPath || !tag || !ghToken) {
-  help();
-  console.error('\x1b[31mRequired argument missing\x1b[0m');
+if (args._.length !== 1) {
+  yargs.showHelp();
+  console.error('A project directory must be provided');
   process.exit(1);
 }
 
-getRepoInfo(projectPath)
-  .then(info => {
-    const 
-      {owner, repo} = info,
-      changelogFile = `${config.changelogDir}/${owner}.${repo}.CHANGELOG.md`;
+const projectPath = args._[0];
 
-    try {
-      fs.accessSync(changelogFile, fs.constants.R_OK);
+run();
+
+async function run() {
+  try {
+    const info = await getRepoInfo(projectPath);
+    const versionInfo = repositories[info.repo].find(v => v.version === args.major);
+
+    if (versionInfo === undefined) {
+      throw new Error(`Unknown major version "${args.major}"" for repository ${info.repo}. Verify the repositories.json file.`);
     }
-    catch (error) {
-      return Promise.reject(new Error(`Aborting: no changelog found for project ${owner}/${repo}`));
+
+    const pr = await getLatestRelease(info.owner, info.repo);
+    const tag = (pr.body.match(new RegExp(`\\(https://github.com/${info.owner}/${info.repo}/releases/tag/(.*?)\\)`)))[1];
+
+    const answer = await ask(`Detected tag: ${tag}. Is that correct (Y|n)? `);
+
+    if (!answer) {
+      throw new Error('Abort.');
     }
 
-    fs.readFile(changelogFile, 'utf8', (err, changelog) => {
-      if (err) {
-        console.error(err);
-        process.exit(1);
-      }
+    const publisher = new Publisher(info.owner, info.repo, tag, args.token, versionInfo.release);
 
-      const publisher = new Publisher(owner, repo, tag, ghToken);
-
-      publisher.publish(changelog, draft, prerelease)
-        .then(res => {
-          console.log(`\x1b[32mSuccessfully published: ${res.html_url}\x1b[0m`);
-        })
-        .catch(err2 => {
-          console.error(`\x1b[31mAn error occured: ${err2.message}\x1b[0m`);
-          process.exit(1);
-        });
-    });
-  })
-  .catch(error => {
+    const result = await publisher.publish(pr.body, args.draft, args.prerelease);
+    console.log(`\x1b[32mSuccessfully published: ${result.html_url}\x1b[0m`);
+  }
+  catch(error) {
     const message = error instanceof Error ? error.message : error;
     console.error(`\x1b[31m${message}\x1b[0m`);
     process.exit(1);
-  });
+  }
+}
 
-function help () {
-  console.log('usage:');
-  console.log('       --tag           Tag to release');
-  console.log('       --gh-token      Your github token');
-  console.log('       --project-path  Path of the project to release');
-  console.log('\noptional:');
-  console.log('       --help          Show this help');
-  console.log('       --draft         Draft the tag in github instead of releasing it');
-  console.log('       --prerelease    Mark the tag as a prerelease version');
+function getLatestRelease(owner, repo) {
+  return rp({
+    uri: `https://${config.github.api}/search/issues?q=repo:${owner}/${repo}+label:release+state:closed&access_token=${args.token}&sort=updated&order=desc`,
+    method: 'GET',
+    headers: {
+      'user-agent': 'ci-changelog'
+    },
+    json: true
+  }).then(result => {
+    if (result.total_count === 0) {
+      throw new Error('No release found. Abort.');
+    }
+
+    return result.items[0];
+  });
 }

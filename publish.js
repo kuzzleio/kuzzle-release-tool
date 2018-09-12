@@ -75,19 +75,19 @@ async function run() {
   }
 }
 
-function getLatestRelease(owner, repo) {
-  return rp({
-    uri: `https://${config.github.api}/search/issues?q=repo:${owner}/${repo}+label:release+state:closed&access_token=${args.token}&sort=updated&order=desc`,
+async function getLatestRelease(owner, repo) {
+  const result = await rp({
+    uri: `https://${config.github.api}/search/issues?q=repo:${owner}/${repo}+label:release+is:merged&access_token=${args.token}&sort=updated&order=desc`,
     method: 'GET',
     headers: {
       'user-agent': 'ci-changelog'
     },
     json: true
-  }).then(result => {
-    if (result.total_count === 0) {
-      throw new Error('No release found. Abort.');
-    }
-
-    return result.items[0];
   });
+
+  if (result.total_count === 0) {
+    throw new Error('No release found. Abort.');
+  }
+
+  return result.items[0];
 }

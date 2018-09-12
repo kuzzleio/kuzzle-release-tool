@@ -19,29 +19,31 @@ const args = yargs
   .strict(true)
   .parse();
 
-Bluebird.map(
-  Object.keys(repositories),
-  repo => detectChanges(repo),
-  {concurrency: config.github.concurrency}
-)
-  .then(_results => {
-    const results = _results.filter(r => r !== null);
+run();
 
-    if (results.length > 0) {
-      console.log('\x1b[32mThe following repositories can be released:\x1b[0m');
+async function run() {
+  let result;
 
-      for (const result of results) {
-        console.log(`\x1b[32m\t${result.name.padEnd(maxRepoName)} => Versions: ${result.versions.join(',')}\x1b[0m`);
-      }
-    } else {
-      console.log('\x1b[32mNothing to release.\x1b[0m');
-    }
-  })
-  .catch(error => {
+  try {
+    result = await Bluebird.map(Object.keys(repositories), detectChanges, {concurrency: config.github.concurrency});
+  } catch(error) {
     console.error(`\x1b[31m${error.message}\x1b[0m`);
     console.error(`\x1b[31m${error.stack}\x1b[0m`);
     process.exit(1);
-  });
+  }
+
+  result = result.filter(r => r !== null);
+
+  if (result.length > 0) {
+    console.log('\x1b[32mThe following repositories can be released:\x1b[0m');
+
+    for (const change of result) {
+      console.log(`\x1b[32m\t${change.name.padEnd(maxRepoName)} => Versions: ${change.versions.join(',')}\x1b[0m`);
+    }
+  } else {
+    console.log('\x1b[32mNothing to release.\x1b[0m');
+  }
+}
 
 function apiRequest (url, querystring = {}) {
   const
@@ -63,97 +65,90 @@ function apiRequest (url, querystring = {}) {
     });
 }
 
-function getBranches(repo) {
-  return apiRequest(`repos/kuzzleio/${repo}/branches`)
-    .then(response => {
-      const branches = {};
+async function getBranches(repo) {
+  const response = await apiRequest(`repos/kuzzleio/${repo}/branches`);
+  const branches = {};
 
-      for (const branch of response) {
-        branches[branch.name] = branch.commit.sha;
-      }
+  for (const branch of response) {
+    branches[branch.name] = branch.commit.sha;
+  }
 
-      return branches;
-    });
+  return branches;
 }
 
-function getLastUpdate (repo, sha) {
-  return apiRequest(`repos/kuzzleio/${repo}/commits`, {sha})
-    .then(response => {
-      let lastUpdate = 0;
+async function getLastUpdate (repo, sha) {
+  let response;
 
-      for (const commit of response) {
-        const lu = new Date(commit.commit.committer.date);
+  try {
+    response = await apiRequest(`repos/kuzzleio/${repo}/commits`, {sha});
+  } catch(err) {
+    if (err.statusCode === 409 && err.message.match('is empty') !== null) {
+      return 0;
+    }
+    throw err;
+  }
 
-        if (lastUpdate < lu) {
-          lastUpdate = lu;
-        }
+  let lastUpdate = 0;
 
-        return lastUpdate;
-      }
-    })
-    .catch(err => {
-      if (err.statusCode === 409 && err.message.match('is empty') !== null) {
-        return 0;
-      }
-      throw err;
-    });
+  for (const commit of response) {
+    const lu = new Date(commit.commit.committer.date);
+
+    if (lastUpdate < lu) {
+      lastUpdate = lu;
+    }
+  }
+
+  return lastUpdate;
 }
 
-function detectChanges(repo) {
-  let
-    branches,
-    devBranchDates;
+async function detectChanges(repo) {
   const
     devBranches = repositories[repo].map(branch => branch.development),
     releaseBranches = repositories[repo].map(branch => branch.release);
 
   console.log(`Scanning project ${repo}...`);
 
-  return getBranches(repo)
-    .then(response => {
-      branches = response;
+  const branches = await getBranches(repo);
+  let missing = devBranches.filter(branch => !branches[branch]);
 
-      let missing = devBranches.filter(branch => !branches[branch]);
+  if (missing.length > 0) {
+    console.error(`\x1b[31m/!\\ [${repo}] Unknown development branches: ${missing.join(',')}\x1b[0m`);
+    process.exit(1);
+  }
 
-      if (missing.length > 0) {
-        console.error(`\x1b[31m/!\\ [${repo}] Unknown development branches: ${missing.join(',')}\x1b[0m`);
-        process.exit(1);
-      }
+  missing = repositories[repo]
+    .map(branch => branch.release)
+    .filter(branch => !branches[branch]);
 
-      missing = repositories[repo]
-        .map(branch => branch.release)
-        .filter(branch => !branches[branch]);
+  if (missing.length > 0) {
+    console.error(`\x1b[31m/!\\ [${repo}] Unknown release branches: ${missing.join(',')}\x1b[0m`);
+    process.exit(1);
+  }
 
-      if (missing.length > 0) {
-        console.error(`\x1b[31m/!\\ [${repo}] Unknown release branches: ${missing.join(',')}\x1b[0m`);
-        process.exit(1);
-      }
 
-      return Bluebird.map(
-        devBranches,
-        devBranch => getLastUpdate(repo, branches[devBranch]),
-        {concurrency: config.github.concurrency});
-    })
-    .then(dates => {
-      devBranchDates = dates;
-      return Bluebird.map(
-        releaseBranches,
-        releaseBranch => getLastUpdate(repo, branches[releaseBranch]),
-        {concurrency: config.github.concurrency});
-    })
-    .then(releaseDates => {
-      const toBeReleased = [];
+  const devBranchDates = await Bluebird.map(
+    devBranches,
+    devBranch => getLastUpdate(repo, branches[devBranch]),
+    {concurrency: config.github.concurrency}
+  );
 
-      for(let i = 0; i < repositories[repo].length; i++) {
-        if (releaseDates[i] < devBranchDates[i]) {
-          toBeReleased.push(repositories[repo][i].version);
-        }
-      }
+  const releaseDates = await Bluebird.map(
+    releaseBranches,
+    releaseBranch => getLastUpdate(repo, branches[releaseBranch]),
+    {concurrency: config.github.concurrency}
+  );
 
-      if (toBeReleased.length > 0) {
-        return {name: repo, versions: toBeReleased};
-      }
+  const toBeReleased = [];
 
-      return null;
-    });
+  for(let i = 0; i < repositories[repo].length; i++) {
+    if (releaseDates[i] < devBranchDates[i]) {
+      toBeReleased.push(repositories[repo][i].version);
+    }
+  }
+
+  if (toBeReleased.length > 0) {
+    return {name: repo, versions: toBeReleased};
+  }
+
+  return null;
 }

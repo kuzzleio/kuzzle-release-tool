@@ -1,19 +1,13 @@
 const
   yargs = require('yargs'),
-  semver = require('semver'),
-  exec = require('child_process').exec,
-  Reader = require('./lib/changelog-gen/reader'),
-  Generator = require('./lib/changelog-gen/generator'),
   Branch = require('./lib/release-mgr/branch'),
   bumpVersion = require('./lib/release-mgr/bumper'),
   PullRequest = require('./lib/release-mgr/pull-request'),
-  ask = require('./lib/ask'),
   fs = require('fs'),
   getRepoInfo = require('./lib/get-repo-info'),
   config = require('./config'),
+  Changelog = require('./lib/changelog'),
   repositories = require('./repositories');
-
-const disclaimer = '[comment]: # (THIS FILE IS PURELY INFORMATIONAL, IT IS NOT USED IN THE RELEASE PROCESS)\n\n';
 
 // arguments parsing
 const args = yargs
@@ -57,40 +51,7 @@ if (args._.length !== 1) {
 
 const dir = args._[0];
 
-let owner, repo, packageInfo, versionInfo;
-
-getProjectInfo()
-  .then(info => {
-    packageInfo = info;
-    return getRepoInfo(dir);
-  })
-  .then(info => {
-    ({owner, repo} = info);
-
-    if (!repositories[repo]) {
-      throw new Error(`Unknown repository ${repo}. Please update the repositories.json file.`);
-    }
-
-    versionInfo = repositories[repo].find(v => v.version === args.major);
-
-    if (versionInfo === undefined) {
-      throw new Error(`Unknown major version "${args.major}"" for repository ${repo}. Verify the repositories.json file.`);
-    }
-
-    return run(args.dryRun);
-  })
-  .then(() => process.exit(0))
-  .catch(error => {
-    if (error) {
-      const message = error instanceof Error ? error.stack : error;
-      console.error(`\x1b[31m${message}\x1b[0m`);
-    }
-    else {
-      console.log('Goodbye.');
-    }
-
-    process.exit(Number(error !== undefined));
-  });
+run();
 
 /*
  * End of main file code
@@ -98,50 +59,47 @@ getProjectInfo()
  * Beyond this point, there should be
  * only functions declaration
  */
+async function run() {
+  try {
+    const
+      packageInfo = await getProjectInfo(),
+      repoInfo = await getRepoInfo(dir);
 
-async function generateNewTag(prs) {
-  let releaseType = 'patch';
-  const breaking = [];
-
-  for (const pr of prs) {
-    for (const label of pr.labels) {
-      if (label === 'changelog:breaking-changes') {
-        breaking.push(pr);
-      } else if (label === 'changelog:new-features') {
-        releaseType = 'minor';
-      }
+    if (!repositories[repoInfo.repo]) {
+      throw new Error(`Unknown repository ${repoInfo.repo}. Please update the repositories.json file.`);
     }
-  }
 
-  if (breaking.length > 0) {
-    releaseType = 'major';
-    console.log('\x1b[31m/!\\ This release contains breaking changes:\x1b[0m');
+    const versionInfo = repositories[repoInfo.repo].find(v => v.version === args.major);
 
-    breaking.forEach(pr => console.log(`  #${pr.id}: ${pr.title}`));
-
-    console.log(`\x1b[31m
-New major versions require manual actions, such as the creation of a new
-target branch (usually named "<new major>-stable"), and adding that new
-version to the "repositories.json" file at the root of this project.
-
-Then a release can be performed using this tool, using the argument:
-  -v <newly created version>
-\x1b[0m`);
-    const answer = await ask('Have these steps been performed (Y|n)? ');
-
-    if (!answer) {
-      console.log('\x1b[31mAbort.\x1b[0m');
-      process.exit(1);
+    if (versionInfo === undefined) {
+      throw new Error(`Unknown major version "${args.major}"" for repository ${repoInfo.repo}. Verify the repositories.json file.`);
     }
+
+    const changelog = new Changelog(dir, args.token, versionInfo, repoInfo, packageInfo);
+    await changelog.generate();
+
+    await writeChangelogToFile(changelog);
+
+    if (args.dryRun) {
+      console.log('Dry run ended successfully.');
+      return;
+    }
+
+    await release(packageInfo, changelog);
   }
+  catch(error) {
+    if (error) {
+      const message = error instanceof Error ? error.stack : error;
+      console.error(`\x1b[31m${message}\x1b[0m`);
+    } else {
+      console.log('Goodbye.');
+    }
 
-  const tag = semver.inc(packageInfo.version, releaseType);
-
-  console.log(`\x1b[32mNew repository tag: ${tag}\x1b[0m`);
-  return tag;
+    process.exit(Number(error !== undefined));
+  }
 }
 
-function makeChangelog () {
+function writeChangelogToFile(changelog) {
   if (!config.changelogDir) {
     throw new Error('No changelog directory configured. Please set a "changelogDir" property in the JSON configuration file');
   }
@@ -153,98 +111,47 @@ function makeChangelog () {
     // directory already exists: do nothing
   }
 
+  const
+    disclaimer = '[comment]: # (THIS FILE IS PURELY INFORMATIONAL, IT IS NOT USED IN THE RELEASE PROCESS)\n\n',
+    changelogFile = `${config.changelogDir}/${changelog.owner}.${changelog.repo}.${args.major}.CHANGELOG.md`;
+
   return new Promise((resolve, reject) => {
-    exec(`cd ${dir} && git fetch ; git log --abbrev-commit origin/${versionInfo.release}..origin/${versionInfo.development}`, (error, stdout) => {
-      if (error) {
-        return reject(error);
+    fs.writeFile(changelogFile, disclaimer + changelog.text, 'utf8', err => {
+      if (err) {
+        return reject(err);
       }
 
-      const
-        generator = new Generator(owner, repo, packageInfo.version, args.token),
-        reader = new Reader(owner, repo, args.token);
-
-      const promises = stdout
-        .split('\n')
-        .map(pr => {
-          // Merge commits
-          if (pr.indexOf('Merge pull request') !== -1) {
-            return reader.readFromGithub(pr.replace(/.*#([0-9]+).*/, '$1'));
-          }
-
-          // Fast-forwards
-          if (pr.indexOf('(#') !== -1) {
-            return reader.readFromGithub(pr.replace(/.*\(#([0-9]+).*/, '$1'));
-          }
-
-          return null;
-        })
-        .filter(line => line);
-
-      let tag, prs;
-
-      Promise.all(promises)
-        .then(_prs => {
-          prs = _prs;
-          return generateNewTag(prs, tag);
-        })
-        .then(_tag => {
-          tag = _tag;
-          return generator.generate(prs, tag);
-        })
-        .then(changelog => {
-          const changelogFile = `${config.changelogDir}/${owner}.${repo}.${args.major}.CHANGELOG.md`;
-
-          fs.writeFile(changelogFile, disclaimer + changelog, 'utf8', err => {
-            if (err) {
-              return reject(err);
-            }
-
-            console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
-            resolve({tag, changelog});
-          });
-
-          return null;
-        })
-        .catch(err => reject(err));
+      console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
+      resolve();
     });
+
+    return null;
   });
 }
 
-function release (branch, changelog, tag) {
-  const
-    pr = new PullRequest(owner, repo, tag, args.token, versionInfo.release);
+async function release (packageInfo, changelog) {
+  const branch = new Branch(dir, changelog.tag);
 
-  return branch.create(tag)
-    .then(() => bumpVersion(dir, packageInfo, tag))
-    .then(() => branch.push(tag))
-    .then(() => pr.create(changelog))
-    .then(issue => pr.updateLabels(issue.number));
-}
+  await branch.checkout(changelog.vinfo.development);
 
-function run (dryRun) {
-  const
-    branch = new Branch(dir);
+  try {
+    await branch.create(changelog.tag);
+    await bumpVersion(dir, packageInfo, changelog.tag);
 
-  // Let's run everything
-  return branch.checkout(versionInfo.development)
-    .then(() => makeChangelog())
-    .then(result => {
-      if (dryRun) {
-        console.log('Dry run ended successfully.');
-        return Promise.resolve();
-      }
+    await branch.push();
 
-      return release(branch, result.changelog, result.tag);
-    })
-    .catch(err => {
-      if (!args.noCleanup && err !== undefined) {
-        // Clean up
-        console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
-        branch.delete('foo');
-      }
+    const pr = new PullRequest(changelog.owner, changelog.repo, changelog.tag, args.token, changelog.vinfo.release);
+    const issue = await pr.create(changelog.text);
+    await pr.updateLabels(issue.number);
+  } catch(err) {
+    if (!args.noCleanup && err !== undefined) {
+      // Clean up
+      console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
+      branch.delete(changelog.tag);
+    }
 
-      return Promise.reject(err);
-    });
+    throw err;
+  }
 }
 
 /**

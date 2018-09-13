@@ -125,7 +125,6 @@ async function detectChanges(repo) {
     process.exit(1);
   }
 
-
   const devBranchDates = await Bluebird.map(
     devBranches,
     devBranch => getLastUpdate(repo, branches[devBranch]),

@@ -81,7 +81,8 @@ The project and its available major versions must be defined in the `repositorie
 | `--major`  | `-m`  | yes       | Repository version to release (see repositories.json) |
 | `--token`  | `-t`  | yes       | Github token. Must give sufficient privileges to create a new pull request |
 | `--dry-run`|       | no | Calculates the new tag, writes the changelogs into a file, and exits without creating a pull request |
-| --no-cleanup |     | no | Do not delete the new release branch when an error occurs |
+| `--no-cleanup` |     | no | Do not delete the new release branch when an error occurs |
+| `--tag`    |       | no | Instead of calculating a new tag, use the provided one |
 
 ## Example
 

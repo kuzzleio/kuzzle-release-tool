@@ -27,15 +27,18 @@ const args = yargs
       group: 'Required'
     },
     'no-cleanup': {
-      alias: 'n',
       describe: 'Do not delete local and remote branches if the script fails',
       type: 'boolean',
       group: 'Optional'
     },
     'dry-run': {
-      alias: 'd',
       describe: 'Generates the changelog, but does not push anything to github',
       type: 'boolean',
+      group: 'Optional'
+    },
+    'tag': {
+      describe: 'Force the release tag with the provided value, instead of calculating it',
+      type: 'string',
       group: 'Optional'
     }
   })
@@ -61,9 +64,7 @@ run();
  */
 async function run() {
   try {
-    const
-      packageInfo = await getProjectInfo(),
-      repoInfo = await getRepoInfo(dir);
+    const repoInfo = await getRepoInfo(dir);
 
     if (!repositories[repoInfo.repo]) {
       throw new Error(`Unknown repository ${repoInfo.repo}. Please update the repositories.json file.`);
@@ -75,7 +76,14 @@ async function run() {
       throw new Error(`Unknown major version "${args.major}"" for repository ${repoInfo.repo}. Verify the repositories.json file.`);
     }
 
+    const packageInfo = await getProjectInfo(versionInfo);
+
     const changelog = new Changelog(dir, args.token, versionInfo, repoInfo, packageInfo);
+
+    if (args.tag) {
+      changelog.forceTag(args.tag);
+    }
+
     await changelog.generate();
 
     await writeChangelogToFile(changelog);
@@ -160,56 +168,59 @@ async function release (packageInfo, changelog) {
  *
  * @return {object}
  */
-function getProjectInfo () {
+function getProjectInfo (vinfo) {
   const files = [
     {name: 'package.json', type: 'json'},
     {name: 'composer.json', type: 'json'},
     {name: 'build.gradle', type: 'gradle'}
   ];
 
-  return new Promise((resolve, reject) => {
-    for (const file of files) {
-      const fullpath = `${dir}/${file.name}`;
+  const branch = new Branch(dir, vinfo.development);
 
-      try {
-        fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
-      }
-      catch(e) {
-        // ignore exception and continue with next file check
-        continue;
-      }
+  return branch.checkout(vinfo.development)
+    .then(() => {
+      for (const file of files) {
+        const fullpath = `${dir}/${file.name}`;
 
-      let version, content;
-
-      if (file.type === 'json') {
-        content = require(fullpath);
-        version = content.version;
-      }
-      else {
-        // for now, there is only gradle projects left
-        // other cases might be added later
         try {
-          content = fs.readFileSync(fullpath, 'utf8');
+          fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
         }
-        catch (error) {
-          return reject(new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`));
+        catch(e) {
+          // ignore exception and continue with next file check
+          continue;
         }
 
-        version = content
-          .split('\n')
-          .filter(line => line.match(/^version\s*=\s*"/))
-          .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+        let version, content;
+
+        if (file.type === 'json') {
+          content = require(fullpath);
+          version = content.version;
+        }
+        else {
+          // for now, there is only gradle projects left
+          // other cases might be added later
+          try {
+            content = fs.readFileSync(fullpath, 'utf8');
+          }
+          catch (error) {
+            throw new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`);
+          }
+
+          version = content
+            .split('\n')
+            .filter(line => line.match(/^version\s*=\s*"/))
+            .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+        }
+
+        return {
+          version,
+          content,
+          type: file.type,
+          name: file.name,
+          path: fullpath
+        };
       }
 
-      return resolve({
-        version,
-        content,
-        type: file.type,
-        name: file.name,
-        path: fullpath
-      });
-    }
-
-    reject(new Error(`No project file found in ${dir}`));
-  });
+      throw new Error(`No project file found in ${dir}`);
+    });
 }

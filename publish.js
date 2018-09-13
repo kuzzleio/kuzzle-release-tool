@@ -54,7 +54,7 @@ async function run() {
       throw new Error(`Unknown major version "${args.major}"" for repository ${info.repo}. Verify the repositories.json file.`);
     }
 
-    const pr = await getLatestRelease(info.owner, info.repo);
+    const pr = await getLatestRelease(info.owner, info.repo, versionInfo.release);
     const tag = (pr.body.match(new RegExp(`\\(https://github.com/${info.owner}/${info.repo}/releases/tag/(.*?)\\)`)))[1];
 
     const answer = await ask(`Detected tag: ${tag}. Is that correct (Y|n)? `);
@@ -75,9 +75,9 @@ async function run() {
   }
 }
 
-async function getLatestRelease(owner, repo) {
+async function getLatestRelease(owner, repo, releaseBranch) {
   const result = await rp({
-    uri: `https://${config.github.api}/search/issues?q=repo:${owner}/${repo}+label:release+is:merged&access_token=${args.token}&sort=updated&order=desc`,
+    uri: `https://${config.github.api}/search/issues?q=base:${releaseBranch}+repo:${owner}/${repo}+label:release+is:merged&access_token=${args.token}&sort=updated&order=desc`,
     method: 'GET',
     headers: {
       'user-agent': 'ci-changelog'

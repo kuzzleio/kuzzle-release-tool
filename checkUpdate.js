@@ -48,7 +48,7 @@ async function run() {
 function apiRequest (url, querystring = {}) {
   const
     qs = Object.assign({access_token: args.token, per_page: 999}, querystring),
-    uri = `http://${config.github.api}/${url}`,
+    uri = `https://${config.github.api}/${url}`,
     options = {
       qs,
       uri,

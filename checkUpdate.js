@@ -1,55 +1,54 @@
 const
+  yargs = require('yargs'),
   rp = require('request-promise'),
-  minimatch = require('minimatch'),
-  config = require('./config.json');
+  Bluebird = require('bluebird'),
+  config = require('./config.json'),
+  repositories = require('./repositories');
+
+const maxRepoName = Object.keys(repositories).reduce((max, name) => Math.max(name.length, max), '');
 
 // arguments parsing
-const
-  args = process.argv.slice(2),
-  user = args.includes('--user') ? args[args.indexOf('--user') + 1] : null,
-  // Authentication token is required for better Github API rate limits
-  // Rate limits on unauthenticated requests are too low for this tool
-  token = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null;
-
-if (args.includes('--help')) {
-  help();
-  process.exit(0);
-}
-
-if (!user || !token) {
-  help();
-  console.error('\x1b[31mRequired argument missing\x1b[0m');
-  process.exit(1);
-}
-
-apiRequest(`orgs/${user}/repos`)
-  .then(repos => {
-    const promises = [];
-
-    for (const repo of repos) {
-      promises.push(detectChanges(repo.name));
-    }
-
-    return Promise.all(promises);
+const args = yargs
+  .usage('USAGE: $0 --token <token>')
+  .option('token', {
+    alias: 't',
+    demandOption: true,
+    type: 'string',
+    describe: 'Github auth token'
   })
-  .catch(error => {
+  .strict(true)
+  .parse();
+
+run();
+
+async function run() {
+  let result;
+
+  try {
+    result = await Bluebird.map(Object.keys(repositories), detectChanges, {concurrency: config.github.concurrency});
+  } catch(error) {
     console.error(`\x1b[31m${error.message}\x1b[0m`);
+    console.error(`\x1b[31m${error.stack}\x1b[0m`);
     process.exit(1);
-  });
+  }
 
+  result = result.filter(r => r !== null);
 
-function help() {
-  console.log('usage:');
-  console.log('       --gh-token     Github auth token');
-  console.log('       --user         The name of the github user owner to scan');
-  console.log('\noptional:');
-  console.log('       --help         Show this help');
+  if (result.length > 0) {
+    console.log('\x1b[32mThe following repositories can be released:\x1b[0m');
+
+    for (const change of result) {
+      console.log(`\x1b[32m\t${change.name.padEnd(maxRepoName)} => Versions: ${change.versions.join(',')}\x1b[0m`);
+    }
+  } else {
+    console.log('\x1b[32mNothing to release.\x1b[0m');
+  }
 }
 
 function apiRequest (url, querystring = {}) {
-  const 
-    qs = Object.assign({access_token: token, per_page: 999}, querystring),
-    uri = `http://${config.github.api}/${url}`,
+  const
+    qs = Object.assign({access_token: args.token, per_page: 999}, querystring),
+    uri = `https://${config.github.api}/${url}`,
     options = {
       qs,
       uri,
@@ -66,84 +65,89 @@ function apiRequest (url, querystring = {}) {
     });
 }
 
-function getBranches(repo) {
-  return apiRequest(`repos/${user}/${repo}/branches`)
-    .then(response => {
-      const branches = {};
+async function getBranches(repo) {
+  const response = await apiRequest(`repos/kuzzleio/${repo}/branches`);
+  const branches = {};
 
-      for (const branch of response) {
-        branches[branch.name] = branch.commit.sha;
-      }
-      
-      return branches;
-    });
+  for (const branch of response) {
+    branches[branch.name] = branch.commit.sha;
+  }
+
+  return branches;
 }
 
-function getLastUpdate (repo, sha) {
-  return apiRequest(`repos/${user}/${repo}/commits`, {sha})
-    .then(response => {
-      let lastUpdate = 0;
+async function getLastUpdate (repo, sha) {
+  let response;
 
-      for (const commit of response) {
-        const lu = new Date(commit.commit.committer.date);
+  try {
+    response = await apiRequest(`repos/kuzzleio/${repo}/commits`, {sha});
+  } catch(err) {
+    if (err.statusCode === 409 && err.message.match('is empty') !== null) {
+      return 0;
+    }
+    throw err;
+  }
 
-        if (lastUpdate < lu) {
-          lastUpdate = lu;
-        }
+  let lastUpdate = 0;
 
-        return lastUpdate;
-      }
-    });
+  for (const commit of response) {
+    const lu = new Date(commit.commit.committer.date);
+
+    if (lastUpdate < lu) {
+      lastUpdate = lu;
+    }
+  }
+
+  return lastUpdate;
 }
 
-function detectChanges(repo) {
-  let 
-    branches,
-    devBranches,
-    devBranchDates;
+async function detectChanges(repo) {
+  const
+    devBranches = repositories[repo].map(branch => branch.development),
+    releaseBranches = repositories[repo].map(branch => branch.release);
 
   console.log(`Scanning project ${repo}...`);
 
-  return getBranches(repo)
-    .then(response => {
-      branches = response;
+  const branches = await getBranches(repo);
+  let missing = devBranches.filter(branch => !branches[branch]);
 
-      devBranches = Object.keys(branches)
-        .filter(name => minimatch(name, config.devBranchPattern));
+  if (missing.length > 0) {
+    console.error(`\x1b[31m/!\\ [${repo}] Unknown development branches: ${missing.join(',')}\x1b[0m`);
+    process.exit(1);
+  }
 
-      const promises = [];
+  missing = repositories[repo]
+    .map(branch => branch.release)
+    .filter(branch => !branches[branch]);
 
-      for (const devbranch of devBranches) {
-        promises.push(getLastUpdate(repo, branches[devbranch]));
-      }
+  if (missing.length > 0) {
+    console.error(`\x1b[31m/!\\ [${repo}] Unknown release branches: ${missing.join(',')}\x1b[0m`);
+    process.exit(1);
+  }
 
-      return Promise.all(promises);
-    })
-    .then(dates => {
-      devBranchDates = dates;
-      return getLastUpdate(repo, branches.master);
-    })
-    .then(masterDate => {
-      let count = 0;
+  const devBranchDates = await Bluebird.map(
+    devBranches,
+    devBranch => getLastUpdate(repo, branches[devBranch]),
+    {concurrency: config.github.concurrency}
+  );
 
-      for(let i = 0; i < devBranches.length; i++) {
-        if (masterDate < devBranchDates[i]) {
-          if (count === 0) {
-            process.stdout.write(`===> ${repo} can be released from: `);
-          }
+  const releaseDates = await Bluebird.map(
+    releaseBranches,
+    releaseBranch => getLastUpdate(repo, branches[releaseBranch]),
+    {concurrency: config.github.concurrency}
+  );
 
-          process.stdout.write(devBranches[i] + ' ');
+  const toBeReleased = [];
 
-          count++;
-        }
-      }
+  for(let i = 0; i < repositories[repo].length; i++) {
+    if (releaseDates[i] < devBranchDates[i]) {
+      toBeReleased.push(repositories[repo][i].version);
+    }
+  }
 
-      if (count > 0) {
-        process.stdout.write('\n');
-      }
+  if (toBeReleased.length > 0) {
+    return {name: repo, versions: toBeReleased};
+  }
 
-      if (count > 1) {
-        console.error('\x1b[31m/!\\ master is behind multiple development branches\x1b[0m');
-      }
-    });
+  return null;
 }

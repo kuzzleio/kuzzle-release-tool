@@ -2,7 +2,8 @@
   "github": {
     "url": "https://github.com",
     "repository": "https://github.com/repos",
-    "api": "api.github.com"
+    "api": "api.github.com",
+    "concurrency": 10
   },
   "labels": {
     "default": "Others",
@@ -16,11 +17,5 @@
       "Enhancements"
     ]
   },
-  "ci": {
-    "api": "https://api.travis-ci.org",
-    "totalRetry": "500",
-    "retryInterval": "500"
-  },
-  "devBranchPattern": "*.x",
   "changelogDir": "changelogs"
 }

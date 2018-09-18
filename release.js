@@ -1,82 +1,113 @@
-const 
-  exec = require('child_process').exec,
-  Reader = require('./lib/changelog-gen/reader'),
-  Generator = require('./lib/changelog-gen/generator'),
+const
+  yargs = require('yargs'),
   Branch = require('./lib/release-mgr/branch'),
   bumpVersion = require('./lib/release-mgr/bumper'),
   PullRequest = require('./lib/release-mgr/pull-request'),
-  ask = require('./lib/ask'),
   fs = require('fs'),
   getRepoInfo = require('./lib/get-repo-info'),
-  config = require('./config.json');
+  config = require('./config'),
+  Changelog = require('./lib/changelog'),
+  repositories = require('./repositories');
 
 // arguments parsing
-const
-  args = process.argv.slice(2),
-  ghToken = args.includes('--gh-token') ? args[args.indexOf('--gh-token') + 1] : null,
-  toTag = args.includes('--to') ? args[args.indexOf('--to') + 1] : null,
-  fromTag = args.includes('--from') ? args[args.indexOf('--from') + 1] : null,
-  tag = args.includes('--tag') ? args[args.indexOf('--tag') + 1] : null,
-  noCleanup = args.includes('--no-cleanup'),
-  projectPath = args.includes('--project-path') ? args[args.indexOf('--project-path') + 1] : null;
+const args = yargs
+  .options({
+    major: {
+      alias: 'm',
+      describe: 'Repository version to release (see repositories.json)',
+      demandOption: true,
+      type: 'number',
+      group: 'Required'
+    },
+    token: {
+      alias: 't',
+      describe: 'Github token',
+      demandOption: true,
+      type: 'string',
+      group: 'Required'
+    },
+    'no-cleanup': {
+      describe: 'Do not delete local and remote branches if the script fails',
+      type: 'boolean',
+      group: 'Optional'
+    },
+    'dry-run': {
+      describe: 'Generates the changelog, but does not push anything to github',
+      type: 'boolean',
+      group: 'Optional'
+    },
+    'tag': {
+      describe: 'Force the release tag with the provided value, instead of calculating it',
+      type: 'string',
+      group: 'Optional'
+    }
+  })
+  .strict(true)
+  .usage('USAGE: $0 -m <major> -t <token> <project directory>')
+  .parse();
 
-if (args.includes('--help')) {
-  help();
-  process.exit(0);
-}
-
-if (!tag || !toTag || !fromTag || !ghToken || !projectPath) {
-  help();
-  console.error('\x1b[31mRequired argument missing\x1b[0m');
+if (args._.length !== 1) {
+  yargs.showHelp();
+  console.error('A repository directory must be provided');
   process.exit(1);
 }
 
-let owner, repo, packageInfo;
+const dir = args._[0];
 
-getProjectInfo()
-  .then(info => {
-    packageInfo = info;
-    return getRepoInfo(projectPath);
-  })
-  .then(info => {
-    ({owner, repo} = info);
+run();
 
-    return run(args.includes('--dry-run'));
-  })
-  .then(() => process.exit(0))
-  .catch(error => {
+/*
+ * End of main file code
+ *
+ * Beyond this point, there should be
+ * only functions declaration
+ */
+async function run() {
+  try {
+    const repoInfo = await getRepoInfo(dir);
+
+    if (!repositories[repoInfo.repo]) {
+      throw new Error(`Unknown repository ${repoInfo.repo}. Please update the repositories.json file.`);
+    }
+
+    const versionInfo = repositories[repoInfo.repo].find(v => v.version === args.major);
+
+    if (versionInfo === undefined) {
+      throw new Error(`Unknown major version "${args.major}"" for repository ${repoInfo.repo}. Verify the repositories.json file.`);
+    }
+
+    const packageInfo = await getProjectInfo(versionInfo);
+
+    const changelog = new Changelog(dir, args.token, versionInfo, repoInfo, packageInfo);
+
+    if (args.tag) {
+      changelog.forceTag(args.tag);
+    }
+
+    await changelog.generate();
+
+    await writeChangelogToFile(changelog);
+
+    if (args.dryRun) {
+      console.log('Dry run ended successfully.');
+      return;
+    }
+
+    await release(packageInfo, changelog);
+  }
+  catch(error) {
     if (error) {
       const message = error instanceof Error ? error.stack : error;
       console.error(`\x1b[31m${message}\x1b[0m`);
-    }
-    else {
+    } else {
       console.log('Goodbye.');
     }
 
     process.exit(Number(error !== undefined));
-  });
-
-/*
- * End of main file code
- * 
- * Beyond this point, there should be
- * only functions declaration
- */
-
-function help () {
-  console.log('usage:');
-  console.log('       --from         The git tag/branch you want to start the release from');
-  console.log('       --to           The git tag/branch you want to stop the release to');
-  console.log('       --tag          Tag to release');
-  console.log('       --gh-token     Your github token');
-  console.log('       --project-path Path of the project to release');
-  console.log('\noptional:');
-  console.log('       --help         Show this help');
-  console.log('       --dry-run      Generate changelog and run tests but do not release');
-  console.log('       --no-cleanup   Do not delete local and remote branches if the script fails');
+  }
 }
 
-function makeChangelog () {
+function writeChangelogToFile(changelog) {
   if (!config.changelogDir) {
     throw new Error('No changelog directory configured. Please set a "changelogDir" property in the JSON configuration file');
   }
@@ -88,149 +119,108 @@ function makeChangelog () {
     // directory already exists: do nothing
   }
 
+  const
+    disclaimer = '[comment]: # (THIS FILE IS PURELY INFORMATIONAL, IT IS NOT USED IN THE RELEASE PROCESS)\n\n',
+    changelogFile = `${config.changelogDir}/${changelog.owner}.${changelog.repo}.${args.major}.CHANGELOG.md`;
+
   return new Promise((resolve, reject) => {
-    exec(`cd ${projectPath} && git fetch ; git log --abbrev-commit origin/${toTag}..origin/${fromTag}`, (error, stdout) => {
-      if (error) {
-        return reject(error);
+    fs.writeFile(changelogFile, disclaimer + changelog.text, 'utf8', err => {
+      if (err) {
+        return reject(err);
       }
 
-      const 
-        generator = new Generator(owner, repo, tag, ghToken),
-        reader = new Reader(owner, repo, ghToken);
-
-      const promises = stdout
-        .split('\n')
-        .map(pr => {
-          // Merge commits
-          if (pr.indexOf('Merge pull request') !== -1) {
-            return reader.readFromGithub(pr.replace(/.*#([0-9]+).*/, '$1'));
-          }
-
-          // Fast-forwards
-          if (pr.indexOf('(#') !== -1) {
-            return reader.readFromGithub(pr.replace(/.*\(#([0-9]+).*/, '$1'));
-          }
-
-          return null;
-        })
-        .filter(line => line);
-
-      Promise.all(promises)
-        .then(result => generator.generate(packageInfo.version, result))
-        .then(changeLog => {
-          const changelogFile = `${config.changelogDir}/${owner}.${repo}.CHANGELOG.md`;
-
-          fs.writeFile(changelogFile, changeLog, 'utf8', err => {
-            if (err) {
-              return reject(err);
-            }
-
-            console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
-            resolve(changeLog);
-          });
-
-          return null;
-        })
-        .catch(err => reject(err));
+      console.log(`\x1b[33mCHANGELOG written in ${changelogFile}\x1b[0m`);
+      resolve();
     });
+
+    return null;
   });
 }
 
-function release (branch, changelog) {
-  const
-    pr = new PullRequest(owner, repo, tag, ghToken);
+async function release (packageInfo, changelog) {
+  const branch = new Branch(dir, changelog.tag);
 
-  return branch.create(tag)
-    .then(() => bumpVersion(projectPath, packageInfo, tag))
-    .then(() => branch.push(tag))
-    .then(() => pr.create(changelog))
-    .then(issue => pr.updateLabels(issue.number));
-}
+  await branch.checkout(changelog.vinfo.development);
 
-function run (dryRun) {
-  const
-    branch = new Branch(tag, projectPath);
+  try {
+    await branch.create(changelog.tag);
+    await bumpVersion(dir, packageInfo, changelog.tag);
 
-  // Let's run everything
-  return branch.checkout(fromTag)
-    .then(() => branch.getCurrent())
-    .then(currentBranch => ask(`\x1b[33mYou are about to make a release based on branch ${currentBranch}\x1b[0m\nAre you sure you want to release? (Y|n) `))
-    .then(() => makeChangelog())
-    .then(changelog => {
-      if (dryRun) {
-        console.log('Dry run ended successfully.');
-        return Promise.resolve();
-      }
+    await branch.push();
 
-      return release(branch, changelog);
-    })
-    .catch(err => {
-      if (!noCleanup && err !== undefined) {
-        // Clean up
-        console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
-        branch.delete(tag);
-      }
+    const pr = new PullRequest(changelog.owner, changelog.repo, changelog.tag, args.token, changelog.vinfo.release);
+    const issue = await pr.create(changelog.text);
+    await pr.updateLabels(issue.number);
+  } catch(err) {
+    if (!args.noCleanup && err !== undefined) {
+      // Clean up
+      console.error('\x1b[31mAn error occured: cleaning up.\x1b[0m');
+      branch.delete(changelog.tag);
+    }
 
-      return Promise.reject(err);
-    });
+    throw err;
+  }
 }
 
 /**
  * Detects the project information file, parse it and return
  * relevant informations
- * 
- * @return {object} 
+ *
+ * @return {object}
  */
-function getProjectInfo () {
+function getProjectInfo (vinfo) {
   const files = [
     {name: 'package.json', type: 'json'},
     {name: 'composer.json', type: 'json'},
     {name: 'build.gradle', type: 'gradle'}
   ];
 
-  return new Promise((resolve, reject) => {
-    for (const file of files) {
-      const fullpath = `${projectPath}/${file.name}`;
-      
-      try {
-        fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
-      }
-      catch(e) {
-        // ignore exception and continue with next file check
-        continue;
-      }
- 
-      let version, content;
+  const branch = new Branch(dir, vinfo.development);
 
-      if (file.type === 'json') {
-        content = require(fullpath);
-        version = content.version;
-      }
-      else {
-        // for now, there is only gradle projects left
-        // other cases might be added later
+  return branch.checkout(vinfo.development)
+    .then(() => {
+      for (const file of files) {
+        const fullpath = `${dir}/${file.name}`;
+
         try {
-          content = fs.readFileSync(fullpath, 'utf8');
+          fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
         }
-        catch (error) {
-          return reject(new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`));
+        catch(e) {
+          // ignore exception and continue with next file check
+          continue;
         }
 
-        version = content
-          .split('\n')
-          .filter(line => line.match(/^version\s*=\s*\"/))
-          .map(line => line.replace(/^version\s*=\s*\"(.*?)\"/, '$1'))[0];
+        let version, content;
+
+        if (file.type === 'json') {
+          content = require(fullpath);
+          version = content.version;
+        }
+        else {
+          // for now, there is only gradle projects left
+          // other cases might be added later
+          try {
+            content = fs.readFileSync(fullpath, 'utf8');
+          }
+          catch (error) {
+            throw new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`);
+          }
+
+          version = content
+            .split('\n')
+            .filter(line => line.match(/^version\s*=\s*"/))
+            .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+        }
+
+        return {
+          version,
+          content,
+          type: file.type,
+          name: file.name,
+          path: fullpath
+        };
       }
 
-      return resolve({
-        version,
-        content,
-        type: file.type,
-        name: file.name,
-        path: fullpath
-      });
-    }
-
-    reject(new Error(`No project file found in ${projectPath}`));
-  });
+      throw new Error(`No project file found in ${dir}`);
+    });
 }

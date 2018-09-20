@@ -131,3 +131,7 @@ Currently, the script will create snapshot in:
 * AWS N. California (us-west-1) on Ubuntu 16.04 (ami-1b1e4b7b)
 * DigitalOcean Amsterdam (ams2) on Ubuntu 16.04 (25615166)
 * DigitalOcean New-York (nyc1) on Ubuntu 16.04 (25615166)
+
+# update-sdks-submodules.sh
+
+Script to update every submodules of all sdk's. You will need to set the `GH_TOKEN` environment variable in order to automatically create a pull request if the submodule is updated.

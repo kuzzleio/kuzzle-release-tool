@@ -6,7 +6,7 @@ R=$RANDOM
 SDKS=(sdk-c sdk-cpp sdk-java sdk-android)
 declare -A SUBMODULES
 SUBMODULES=(
-  [${SDKS[0]}]="./go" 
+  [${SDKS[0]}]="./go"
   [${SDKS[1]}]="./test/features/sdk-features ./sdk-c ./sdk-c/go"
   [${SDKS[2]}]="./features/sdk-features ./sdk-cpp ./sdk-cpp/sdk-c ./sdk-cpp/sdk-c/go ./sdk-cpp/test/features/sdk-features"
   [${SDKS[3]}]="./sdk-java ./sdk-java/sdk-cpp ./sdk-java/sdk-cpp/sdk-c ./sdk-java/sdk-cpp/sdk-c/go ./sdk-java/sdk-cpp/test/features/sdk-features ./sdk-java/features/sdk-features"

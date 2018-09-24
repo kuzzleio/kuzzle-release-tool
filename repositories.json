@@ -1,0 +1,63 @@
+{
+  "boost-geospatial-index": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "documentation": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "dumpme": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "koncorde": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-admin-console": [
+    {"version": 2, "development": "2-dev", "release": "master"}
+  ],
+  "kuzzle-common-objects": [
+    {"version": 3, "development": "3-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-auth-passport-local": [
+    {"version": 5, "development": "5-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-auth-passport-oauth": [
+    {"version": 4, "development": "4-dev", "release": "master"}
+  ],
+  "kuzzle-core-plugin-boilerplate": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-cluster": [
+    {"version": 3, "development": "3-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-logger": [
+    {"version": 2, "development": "2-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-probe": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-probe-listener": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-proxy": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "protocol-mqtt": [
+    {"version": 2, "development": "2-dev", "release": "master"}
+  ],
+  "sdk-android": [
+    {"version": 3, "development": "3-dev", "release": "master"}
+  ],
+  "sdk-go": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "sdk-javascript": [
+    {"version": 5, "development": "5-dev", "release": "master"},
+    {"version": 6, "development": "6-dev", "release": "6-beta"}
+  ],
+  "sdk-php": [
+    {"version": 3, "development": "3-dev", "release": "master"}
+  ]
+}

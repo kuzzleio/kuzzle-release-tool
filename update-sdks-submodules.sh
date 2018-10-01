@@ -13,6 +13,7 @@ SUBMODULES=(
 )
 
 OWNER=kuzzleio
+NEED_PR=0
 
 for SDK in ${SDKS[@]};
 do
@@ -31,17 +32,19 @@ do
     git checkout master
     RES=$(git pull)
     echo $RES
-    cd -
-    if [ "$RES" != "Already up-to-date." ]; then
-      git add $SUBMODULE
+    if [ "$RES" != "Already up to-date." ]; then
+	git add $SUBMODULE
+	NEED_PR=1
     fi
+    cd -
   done
 
-  if [ "$RES" != "Already up-to-date." ]; then
+  if [ $NEED_PR -eq 1 ]; then
     git checkout -b update-submodules-$R
     git commit -am "Update submodules"
     git push origin update-submodules-$R
     curl -X POST https://github.com/$OWNER/$SDK/pulls?access_token=$GH_TOKEN -H "Content-Type: application/json" --data '{"title":"Update submodules","body":"Automatically update submodules.","head":"update-submodules-$R","base":"master"}'
   fi
+  NEED_PR=0
   echo
 done

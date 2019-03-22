@@ -3,7 +3,7 @@
     {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "documentation": [
-    {"version": 1, "development": "1-dev", "release": "master"}
+    {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "dumpme": [
     {"version": 1, "development": "1-dev", "release": "master"}

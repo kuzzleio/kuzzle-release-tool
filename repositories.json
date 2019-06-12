@@ -59,5 +59,8 @@
   ],
   "sdk-php": [
     {"version": 3, "development": "3-dev", "release": "master"}
+  ],
+  "sdk-csharp": [
+    {"version": 0, "development": "0-dev", "release": "master"}
   ]
 }

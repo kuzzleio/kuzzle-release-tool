@@ -171,10 +171,12 @@ async function release (packageInfo, changelog) {
  */
 function getProjectInfo (vinfo) {
   const files = [
-    {name: 'package.json', type: 'json'},
     {name: 'composer.json', type: 'json'},
     {name: 'build.gradle', type: 'gradle'},
-    {name: '**/*.nuspec', type: 'nuget'}
+    {name: '**/*.nuspec', type: 'nuget'},
+    // some non-node projects contain a package.json to build the documentation,
+    // so we should always check this file last
+    {name: 'package.json', type: 'json'}
   ];
 
   const branch = new Branch(dir, vinfo.development);

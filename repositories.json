@@ -44,6 +44,12 @@
   "kuzzle-proxy": [
     {"version": 1, "development": "1-dev", "release": "master"}
   ],
+  "kuzzle-vault": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-cli": [
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
   "protocol-mqtt": [
     {"version": 2, "development": "2-dev", "release": "master"}
   ],

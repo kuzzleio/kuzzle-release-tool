@@ -1,4 +1,5 @@
 const
+  find = require('fast-glob'),
   yargs = require('yargs'),
   Branch = require('./lib/release-mgr/branch'),
   bumpVersion = require('./lib/release-mgr/bumper'),
@@ -170,9 +171,12 @@ async function release (packageInfo, changelog) {
  */
 function getProjectInfo (vinfo) {
   const files = [
-    {name: 'package.json', type: 'json'},
     {name: 'composer.json', type: 'json'},
-    {name: 'build.gradle', type: 'gradle'}
+    {name: 'build.gradle', type: 'gradle'},
+    {name: '**/*.nuspec', type: 'nuget'},
+    // some non-node projects contain a package.json to build the documentation,
+    // so we should always check this file last
+    {name: 'package.json', type: 'json'}
   ];
 
   const branch = new Branch(dir, vinfo.development);
@@ -180,36 +184,39 @@ function getProjectInfo (vinfo) {
   return branch.checkout(vinfo.development)
     .then(() => {
       for (const file of files) {
-        const fullpath = `${dir}/${file.name}`;
+        const entries = find.sync(
+          file.name,
+          {cwd: dir, onlyFiles: true, absolute: true});
 
-        try {
-          fs.accessSync(fullpath, fs.constants.R_OK | fs.constants.W_OK);
-        }
-        catch(e) {
-          // ignore exception and continue with next file check
+        if (entries.length === 0) {
           continue;
+        } else if (entries.length > 1) {
+          throw new Error(`Error: found too many project files (type: ${file.type}, found: ${entries})`);
         }
 
         let version, content;
 
         if (file.type === 'json') {
-          content = require(fullpath);
+          content = require(entries[0]);
           version = content.version;
-        }
-        else {
-          // for now, there is only gradle projects left
-          // other cases might be added later
+        } else {
           try {
-            content = fs.readFileSync(fullpath, 'utf8');
-          }
-          catch (error) {
+            content = fs.readFileSync(entries[0], 'utf8');
+          } catch (error) {
             throw new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`);
           }
 
-          version = content
-            .split('\n')
-            .filter(line => line.match(/^version\s*=\s*"/))
-            .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+          if (file.type === 'gradle') {
+            version = content
+              .split('\n')
+              .filter(line => line.match(/^version\s*=\s*"/))
+              .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+          } else if (file.type === 'nuget') {
+            version = content
+              .split('\n')
+              .filter(line => line.match(/<version>(.*?)<\/version>/))
+              .map(line => line.replace(/.*<version>(.*?)<\/version>.*/, '$1'))[0];
+          }
         }
 
         return {
@@ -217,7 +224,7 @@ function getProjectInfo (vinfo) {
           content,
           type: file.type,
           name: file.name,
-          path: fullpath
+          path: entries[0]
         };
       }
 

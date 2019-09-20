@@ -61,7 +61,8 @@
   ],
   "sdk-javascript": [
     {"version": 5, "development": "5-dev", "release": "5-stable"},
-    {"version": 6, "development": "6-dev", "release": "master"}
+    {"version": 6, "development": "6-dev", "release": "6-stable"},
+    {"version": 7, "development": "7-dev", "release": "master"}
   ],
   "sdk-php": [
     {"version": 3, "development": "3-dev", "release": "master"}

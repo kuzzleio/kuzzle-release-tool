@@ -26,7 +26,8 @@
     {"version": 4, "development": "4-dev", "release": "master"}
   ],
   "kuzzle-core-plugin-boilerplate": [
-    {"version": 1, "development": "1-dev", "release": "master"}
+    {"version": 1, "development": "1-dev", "release": "1-stable"},
+    {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "kuzzle-plugin-cluster": [
     {"version": 3, "development": "3-dev", "release": "3-stable"},
@@ -68,6 +69,10 @@
     {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "sdk-csharp": [
-    {"version": 0, "development": "0-dev", "release": "master"}
+    {"version": 1, "development": "1-dev", "release": "master"}
+  ],
+  "kuzzle-plugin-s3": [
+    {"version": 1, "development": "1-dev", "release": "1-stable"},
+    {"version": 2, "development": "2-dev", "release": "master"}
   ]
 }

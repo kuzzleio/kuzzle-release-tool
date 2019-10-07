@@ -34,7 +34,8 @@
     {"version": 4, "development": "4-dev", "release": "master"}
   ],
   "kuzzle-plugin-logger": [
-    {"version": 2, "development": "2-dev", "release": "master"}
+    {"version": 2, "development": "2-dev", "release": "2-stable"},
+    {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "kuzzle-plugin-probe": [
     {"version": 1, "development": "1-dev", "release": "master"}

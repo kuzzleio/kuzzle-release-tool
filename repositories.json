@@ -6,7 +6,8 @@
     {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "koncorde": [
-    {"version": 1, "development": "1-dev", "release": "master"}
+    {"version": 1, "development": "1-dev", "release": "1-stable"},
+    {"version": 1, "development": "2-dev", "release": "master"}
   ],
   "kuzzle": [
     {"version": 1, "development": "1-dev", "release": "1-stable"},

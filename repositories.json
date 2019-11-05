@@ -9,8 +9,8 @@
     {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "kuzzle": [
-    {"version": 1, "development": "1-dev", "release": "1-stable"},
-    {"version": 2, "development": "2-dev", "release": "master"}
+    {"version": 1, "development": "1-dev", "release": "master"},
+    {"version": 2, "development": "2-dev", "release": "2-beta"}
   ],
   "kuzzle-admin-console": [
     {"version": 2, "development": "2-dev", "release": "master"}
@@ -62,8 +62,8 @@
   ],
   "sdk-javascript": [
     {"version": 5, "development": "5-dev", "release": "5-stable"},
-    {"version": 6, "development": "6-dev", "release": "6-stable"},
-    {"version": 7, "development": "7-dev", "release": "master"}
+    {"version": 6, "development": "6-dev", "release": "master"},
+    {"version": 7, "development": "7-dev", "release": "7-beta"}
   ],
   "sdk-php": [
     {"version": 3, "development": "3-dev", "release": "master"}

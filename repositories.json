@@ -22,7 +22,8 @@
     {"version": 4, "development": "4-dev", "release": "master"}
   ],
   "kuzzle-plugin-auth-passport-local": [
-    {"version": 5, "development": "5-dev", "release": "master"}
+    {"version": 5, "development": "5-dev", "release": "5-stable"},
+    {"version": 6, "development": "6-dev", "release": "master"}
   ],
   "kuzzle-plugin-auth-passport-oauth": [
     {"version": 4, "development": "4-dev", "release": "master"}

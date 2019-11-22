@@ -10,11 +10,12 @@
     {"version": 1, "development": "2-dev", "release": "master"}
   ],
   "kuzzle": [
-    {"version": 1, "development": "1-dev", "release": "master"},
-    {"version": 2, "development": "2-dev", "release": "2-beta"}
+    {"version": 1, "development": "1-dev", "release": "1-stable"},
+    {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "kuzzle-admin-console": [
-    {"version": 2, "development": "2-dev", "release": "master"}
+    {"version": 2, "development": "2-dev", "release": "2-stable"},
+    {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "kuzzle-common-objects": [
     {"version": 3, "development": "3-dev", "release": "3-stable"},
@@ -64,8 +65,8 @@
   ],
   "sdk-javascript": [
     {"version": 5, "development": "5-dev", "release": "5-stable"},
-    {"version": 6, "development": "6-dev", "release": "master"},
-    {"version": 7, "development": "7-dev", "release": "7-beta"}
+    {"version": 6, "development": "6-dev", "release": "6-stable"},
+    {"version": 7, "development": "7-dev", "release": "master"}
   ],
   "sdk-php": [
     {"version": 3, "development": "3-dev", "release": "master"}

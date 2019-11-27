@@ -74,7 +74,7 @@
     {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "sdk-csharp": [
-    {"version": 1, "development": "1-dev", "release": "1-stable"}
+    {"version": 1, "development": "1-dev", "release": "1-stable"},
     {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "kuzzle-plugin-s3": [

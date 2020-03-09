@@ -85,5 +85,8 @@
   "kuzzle-plugin-prometheus": [
     {"version": 1, "development": "1-dev", "release": "1-stable"},
     {"version": 2, "development": "2-dev", "release": "master"}
+  ],
+  "kourou": [
+    {"version": 0, "development": "develop", "release": "master"}
   ]
 }

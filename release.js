@@ -1,14 +1,16 @@
-const
-  find = require('fast-glob'),
-  yargs = require('yargs'),
-  Branch = require('./lib/release-mgr/branch'),
-  bumpVersion = require('./lib/release-mgr/bumper'),
-  PullRequest = require('./lib/release-mgr/pull-request'),
-  fs = require('fs'),
-  getRepoInfo = require('./lib/get-repo-info'),
-  config = require('./config'),
-  Changelog = require('./lib/changelog'),
-  repositories = require('./repositories');
+const fs = require('fs');
+
+const find = require('fast-glob');
+const yargs = require('yargs');
+
+const Branch = require('./lib/release-mgr/branch');
+const bumpVersion = require('./lib/release-mgr/bumper');
+const changeDocTags = require('./lib/release-mgr/doc-tag');
+const PullRequest = require('./lib/release-mgr/pull-request');
+const getRepoInfo = require('./lib/get-repo-info');
+const config = require('./config');
+const Changelog = require('./lib/changelog');
+const repositories = require('./repositories');
 
 // arguments parsing
 const args = yargs
@@ -146,6 +148,7 @@ async function release (packageInfo, changelog) {
   try {
     await branch.create(changelog.tag);
     await bumpVersion(dir, packageInfo, changelog.tag);
+    await changeDocTags(dir, changelog.tag);
 
     await branch.push();
 

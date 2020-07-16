@@ -45,24 +45,24 @@ async function run() {
   }
 }
 
-function apiRequest (url, querystring = {}) {
-  const
-    qs = Object.assign({access_token: args.token, per_page: 999}, querystring),
-    uri = `https://${config.github.api}/${url}`,
-    options = {
-      qs,
-      uri,
-      json: true,
-      headers: {
-        'User-Agent': 'Request-Promise'
-      }
-    };
+async function apiRequest (url, querystring = {}) {
+  const uri = `https://${config.github.api}/${url}`;
 
-  return rp(options)
-    .catch(error => {
-      console.error(`\x1b[31mGithub API call failed on URL: ${uri}\x1b[0m`);
-      throw error;
+  try {
+    return await rp({
+      headers: {
+        'user-agent': 'ci-changelog',
+        'authorization': `token ${args.token}`,
+      },
+      json: true,
+      qs: Object.assign({per_page: 999}, querystring),
+      uri,
     });
+  }
+  catch(error) {
+    console.error(`\x1b[31mGithub API call failed on URL: ${uri}\x1b[0m`);
+    throw error;
+  }
 }
 
 async function getBranches(repo) {

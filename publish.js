@@ -77,12 +77,18 @@ async function run() {
 
 async function getLatestRelease(owner, repo, releaseBranch) {
   const result = await rp({
-    uri: `https://${config.github.api}/search/issues?q=base:${releaseBranch}+repo:${owner}/${repo}+label:release+is:merged&access_token=${args.token}&sort=updated&order=desc`,
+    uri: `https://${config.github.api}/search/issues`,
+    qs: {
+      q: `base:${releaseBranch}+repo:${owner}/${repo}+label:release+is:merged`,
+      sort: 'updated',
+      order: 'desc',
+    },
     method: 'GET',
     headers: {
-      'user-agent': 'ci-changelog'
+      'authorization': `token ${args.token}`,
+      'user-agent': 'ci-changelog',
     },
-    json: true
+    json: true,
   });
 
   if (result.total_count === 0) {

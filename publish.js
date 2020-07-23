@@ -77,12 +77,7 @@ async function run() {
 
 async function getLatestRelease(owner, repo, releaseBranch) {
   const result = await rp({
-    uri: `https://${config.github.api}/search/issues`,
-    qs: {
-      q: `base:${releaseBranch}+repo:${owner}/${repo}+label:release+is:merged`,
-      sort: 'updated',
-      order: 'desc',
-    },
+    uri: `https://${config.github.api}/search/issues?q=base:${releaseBranch}+repo:${owner}/${repo}+label:release+is:merged&sort=updated&order=desc`,
     method: 'GET',
     headers: {
       'authorization': `token ${args.token}`,

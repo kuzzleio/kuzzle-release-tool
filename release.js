@@ -205,7 +205,8 @@ async function getProjectInfo (vinfo) {
       throw new Error(`Error: found too many project files (type: ${file.type}, found: ${entries})`);
     }
 
-    let version, content;
+    let version;
+    let content;
 
     if (file.type === 'json') {
       content = require(entries[0]);

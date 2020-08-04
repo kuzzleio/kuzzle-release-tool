@@ -92,5 +92,8 @@
   ],
   "kourou": [
     {"version": 0, "development": "develop", "release": "master"}
+  ],
+  "sdk-jvm": [
+    {"version": 1, "development": "1-dev", "release": "master"}
   ]
 }

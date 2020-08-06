@@ -2,6 +2,7 @@ const fs = require('fs');
 
 const find = require('fast-glob');
 const yargs = require('yargs');
+const yaml = require('yaml');
 
 const Branch = require('./lib/release-mgr/branch');
 const bumpVersion = require('./lib/release-mgr/bumper');
@@ -172,65 +173,79 @@ async function release (packageInfo, changelog) {
  *
  * @return {object}
  */
-function getProjectInfo (vinfo) {
+async function getProjectInfo (vinfo) {
   const files = [
+    {name: 'pubspec.yaml', type: 'dart'},
     {name: 'composer.json', type: 'json'},
     {name: 'build.gradle', type: 'gradle'},
+    // kotlin scripts aren't in gradle format, but the version number is
+    // encoded the exact same way
+    {name: 'build.gradle.kts', type: 'gradle'},
     {name: '**/*.nuspec', type: 'nuget'},
     // some non-node projects contain a package.json to build the documentation,
     // so we should always check this file last
-    {name: 'package.json', type: 'json'}
+    {name: 'package.json', type: 'json'},
   ];
 
   const branch = new Branch(dir, vinfo.development);
 
-  return branch.checkout(vinfo.development)
-    .then(() => {
-      for (const file of files) {
-        const entries = find.sync(
-          file.name,
-          {cwd: dir, onlyFiles: true, absolute: true});
+  await branch.checkout(vinfo.development);
 
-        if (entries.length === 0) {
-          continue;
-        } else if (entries.length > 1) {
-          throw new Error(`Error: found too many project files (type: ${file.type}, found: ${entries})`);
-        }
+  for (const file of files) {
+    const entries = find.sync(file.name, {
+      cwd: dir,
+      onlyFiles: true,
+      absolute: true,
+    });
 
-        let version, content;
+    if (entries.length === 0) {
+      continue;
+    }
+    else if (entries.length > 1) {
+      throw new Error(`Error: found too many project files (type: ${file.type}, found: ${entries})`);
+    }
 
-        if (file.type === 'json') {
-          content = require(entries[0]);
-          version = content.version;
-        } else {
-          try {
-            content = fs.readFileSync(entries[0], 'utf8');
-          } catch (error) {
-            throw new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`);
-          }
+    let version;
+    let content;
 
-          if (file.type === 'gradle') {
-            version = content
-              .split('\n')
-              .filter(line => line.match(/^version\s*=\s*"/))
-              .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
-          } else if (file.type === 'nuget') {
-            version = content
-              .split('\n')
-              .filter(line => line.match(/<version>(.*?)<\/version>/))
-              .map(line => line.replace(/.*<version>(.*?)<\/version>.*/, '$1'))[0];
-          }
-        }
-
-        return {
-          version,
-          content,
-          type: file.type,
-          name: file.name,
-          path: entries[0]
-        };
+    if (file.type === 'json') {
+      content = require(entries[0]);
+      version = content.version;
+    }
+    else {
+      try {
+        content = fs.readFileSync(entries[0], 'utf8');
+      }
+      catch (error) {
+        throw new Error(`${file.type} project detected, but an error occured while attempting to read ${file.name}:\n${error.message}`);
       }
 
-      throw new Error(`No project file found in ${dir}`);
-    });
+      if (file.type === 'gradle') {
+        version = content
+          .split('\n')
+          .filter(line => line.match(/^version\s*=\s*"/))
+          .map(line => line.replace(/^version\s*=\s*"(.*?)"/, '$1'))[0];
+      }
+      else if (file.type === 'nuget') {
+        version = content
+          .split('\n')
+          .filter(line => line.match(/<version>(.*?)<\/version>/))
+          .map(line => line.replace(/.*<version>(.*?)<\/version>.*/, '$1'))[0];
+      }
+      else if (file.type === 'dart') {
+        content = yaml.parse(content);
+        version = content.version;
+      }
+    }
+
+    return {
+      version,
+      content,
+      type: file.type,
+      name: file.name,
+      path: entries[0]
+    };
+  }
+
+  throw new Error(`No project file found in ${dir}`);
 }

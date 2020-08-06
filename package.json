@@ -2,10 +2,11 @@
   "name": "kuzzle-release-tool",
   "dependencies": {
     "bluebird": "^3.7.2",
-    "fast-glob": "^2.2.7",
+    "fast-glob": "^3.2.4",
     "request": "^2.88.2",
-    "request-promise": "^4.2.5",
-    "semver": "^5.7.1",
-    "yargs": "^13.3.2"
+    "request-promise": "^4.2.6",
+    "semver": "^7.3.2",
+    "yaml": "^1.10.0",
+    "yargs": "^15.4.1"
   }
 }

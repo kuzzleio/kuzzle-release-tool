@@ -111,5 +111,8 @@
   ],
   "kuzzle-plugin-multi-tenancy": [
     {"version": 0, "development": "1-dev", "release": "master"}
+  ],
+  "ergol": [
+    {"version": 1, "development": "1-dev", "release": "master"}
   ]
 }

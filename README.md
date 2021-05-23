@@ -112,9 +112,9 @@ This script creates that new tag, using the release pull request to get the tag 
 
 `node publish.js -t <token> -m <major> <project directory>`
 
-| Options    | Required? | Description                                        |
-|------------|----------------------------------------------------------------|
-| `--major`  | `-m`  | yes       | Repository version to release (see repositories.json) |
+| Options    | Alias | Required? | Description                                                       |
+|------------|-------|-----------|-------------------------------------------------------------------|
+| `--major`  | `-m`  | yes       | Repository version to release (see repositories.json)             |
 | `--token`  | `-t`  | yes       | Github token. Must give sufficient privileges to create a new tag |
 
 

@@ -91,7 +91,8 @@
   ],
   "kuzzle-plugin-prometheus": [
     {"version": 1, "development": "1-dev", "release": "1-stable"},
-    {"version": 2, "development": "2-dev", "release": "master"}
+    {"version": 2, "development": "2-dev", "release": "2-stable"},
+    {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "kourou": [
     {"version": 0, "development": "develop", "release": "master"}
@@ -110,6 +111,9 @@
   ],
   "kuzzle-plugin-multi-tenancy": [
     {"version": 0, "development": "1-dev", "release": "master"}
+  ],
+  "ergol": [
+    {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "kuzzle-plugin-hermes-messenger": [
     {"version": 0, "development": "1-dev", "release": "master"}

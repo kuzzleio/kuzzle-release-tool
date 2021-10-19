@@ -84,7 +84,7 @@
     {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "sdk-dart": [
-    {"version": 2, "development": "2-dev", "release": "master"},
+    {"version": 2, "development": "2-dev", "release": "2-stable"},
     {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "kuzzle-plugin-s3": [

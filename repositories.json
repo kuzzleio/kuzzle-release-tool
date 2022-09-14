@@ -126,5 +126,8 @@
   "geodis-sdl": [
     {"version": 1, "development": "1-dev", "release": "1-stable"},
     {"version": 2, "development": "2-dev", "release": "master"}
+  ],
+  "dashboard-builder": [
+    {"version": 0, "development": "0-dev", "release": "master"}
   ]
 }

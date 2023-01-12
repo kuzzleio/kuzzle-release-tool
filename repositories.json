@@ -99,7 +99,8 @@
     {"version": 4, "development": "4-dev", "release": "master"}
   ],
   "kourou": [
-    {"version": 0, "development": "develop", "release": "master"}
+    {"version": 0, "development": "develop", "release": "master"},
+    {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "sdk-jvm": [
     {"version": 1, "development": "1-dev", "release": "master"}
@@ -111,8 +112,8 @@
     {"version": 0, "development": "1-dev", "release": "master"}
   ],
   "kuzzle-plugin-device-manager": [
-    {"version": 0, "development": "1-dev", "release": "master"},
-    {"version": 2, "development": "2-dev", "release": "2-stable"}
+    {"version": 0, "development": "1-dev", "release": "1-stable"},
+    {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "kuzzle-plugin-multi-tenancy": [
     {"version": 1, "development": "1-dev", "release": "master"}

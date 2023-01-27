@@ -85,7 +85,6 @@
     {"version": 2, "development": "2-dev", "release": "master"}
   ],
   "sdk-dart": [
-    {"version": 2, "development": "2-dev", "release": "2-stable"},
     {"version": 3, "development": "3-dev", "release": "master"}
   ],
   "kuzzle-plugin-s3": [
@@ -102,9 +101,6 @@
     {"version": 0, "development": "1-dev", "release": "master"}
   ],
   "sdk-jvm": [
-    {"version": 1, "development": "1-dev", "release": "master"}
-  ],
-  "kuzzle-iot-platform": [
     {"version": 1, "development": "1-dev", "release": "master"}
   ],
   "kuzzle-plugin-workflows": [
